@@ -1,244 +1,487 @@
+/**
+ * Dataset Scorer — Adaptive Weighted Ranking
+ *
+ * Uses query understanding to compute adaptive weights.
+ * If modality was EXPLICITLY stated, modality match is worth more.
+ * If task was EXPLICITLY stated, task match is worth more.
+ *
+ * KEY FIX: "Heart Disease Health Indicators Dataset" (tabular, classification)
+ * will receive near-zero scores for "coronary artery segmentation CT" queries
+ * because:
+ *  - modality: CT (confirmed) vs dataset modality: tabular → 0 points
+ *  - task: segmentation (confirmed) vs dataset task: classification → 0 points
+ *  - hard filter catches it first
+ */
+
+import type { NormalizedDataset } from '../../schemas/types';
+import type { QueryUnderstanding } from '../queryUnderstanding/queryParser';
 import { applyHardNegativeFilter } from './hardNegativeFilter';
 
-function normalize(s: string): string {
+// ── Score thresholds for result categories ────────────────────────────────────
+export const SCORE_THRESHOLDS = {
+    BEST_MATCH: 75,       // Shown as "Best Match"
+    STRONG_MATCH: 55,     // Shown as "Strong Match"
+    PARTIAL_MATCH: 35,    // Shown as "Partial Match"
+    RELATED: 20,          // Shown as "Related"
+    NOT_RECOMMENDED: 0,   // Filtered / not shown
+};
+
+export type MatchCategory = 'BEST_MATCH' | 'STRONG_MATCH' | 'PARTIAL_MATCH' | 'RELATED' | 'NOT_RECOMMENDED';
+
+export function getMatchCategory(score: number, rejected: boolean): MatchCategory {
+    if (rejected) return 'NOT_RECOMMENDED';
+    if (score >= SCORE_THRESHOLDS.BEST_MATCH) return 'BEST_MATCH';
+    if (score >= SCORE_THRESHOLDS.STRONG_MATCH) return 'STRONG_MATCH';
+    if (score >= SCORE_THRESHOLDS.PARTIAL_MATCH) return 'PARTIAL_MATCH';
+    if (score >= SCORE_THRESHOLDS.RELATED) return 'RELATED';
+    return 'NOT_RECOMMENDED';
+}
+
+// ── Adaptive weight computation ───────────────────────────────────────────────
+
+interface ScoreWeights {
+    semantic: number;
+    task: number;
+    modality: number;
+    target: number;
+    domain: number;
+    subdomain: number;
+    metadata: number;
+    popularity: number;
+}
+
+function computeAdaptiveWeights(qu: QueryUnderstanding): ScoreWeights {
+    const explicit = qu.explicitFields;
+
+    // Base weights
+    let w = {
+        semantic: 25,
+        task: 20,
+        modality: 15,
+        target: 15,
+        domain: 10,
+        subdomain: 5,
+        metadata: 5,
+        popularity: 5,
+    };
+
+    // Boost task weight if task was explicitly stated
+    if (explicit.has('task')) {
+        w.task += 10;
+        w.domain -= 5;
+        w.metadata -= 5;
+    }
+
+    // Boost modality weight if modality was explicitly stated
+    if (explicit.has('modality')) {
+        w.modality += 10;
+        w.popularity -= 5;
+        w.subdomain -= 5;
+    }
+
+    // Boost target weight if target was explicitly stated
+    if (explicit.has('target')) {
+        w.target += 10;
+        w.domain -= 5;
+        w.metadata -= 5;
+    }
+
+    // Reduce semantic for very specific queries (metadata matching is more reliable)
+    if (explicit.size >= 3) {
+        w.semantic -= 10;
+        w.task += 5;
+        w.modality += 5;
+    }
+
+    // Ensure all weights are non-negative
+    for (const k of Object.keys(w) as (keyof ScoreWeights)[]) {
+        w[k] = Math.max(0, w[k]);
+    }
+
+    // Normalize to sum to 100
+    const total = Object.values(w).reduce((a, b) => a + b, 0);
+    if (total !== 100) {
+        const scale = 100 / total;
+        for (const k of Object.keys(w) as (keyof ScoreWeights)[]) {
+            w[k] = Math.round(w[k] * scale);
+        }
+    }
+
+    return w;
+}
+
+// ── Individual scoring components ─────────────────────────────────────────────
+
+function n(s?: string): string {
     return (s ?? '').toLowerCase().trim();
 }
 
-function overlap(a: string, b: string): number {
-    const na = normalize(a); const nb = normalize(b);
-    if (!na || !nb) return 0;
-    if (na.includes(nb) || nb.includes(na)) return 1;
-    const wordsA = new Set(na.split(/\W+/).filter(w => w.length > 2));
-    const wordsB = nb.split(/\W+/).filter(w => w.length > 2);
-    const common = wordsB.filter(w => wordsA.has(w)).length;
-    return wordsB.length > 0 ? common / wordsB.length : 0;
-}
+/**
+ * Semantic relevance: does the dataset text blob contain the query's key terms?
+ * This is a weighted keyword match across title, description, tags, features.
+ */
+function scoreSemanticRelevance(ds: Partial<NormalizedDataset>, qu: QueryUnderstanding): number {
+    const titleWeight = 3;
+    const tagWeight = 2;
+    const descWeight = 1;
 
-const TASK_KEYWORDS: Record<string, string[]> = {
-    'Object Detection':          ['object detection','bounding box','bbox','detection','localization','yolo','faster rcnn','vehicle detection','car detection','annotated','labeled images','labelled'],
-    'Multi-Object Tracking':     ['tracking','mot','multi-object','vehicle tracking','trajectory','bytetrack','botsort','multi object','surveillance'],
-    'Counting':                  ['counting','count','crowd count','vehicle count','pedestrian count','people counting'],
-    'Defect Detection':          ['defect detection','surface defect','industrial defect','scratch','crack','dent','missing component','surface damage','inspection','quality control','defect'],
-    'Image Classification':      ['image classification','classification','medical image','mri','ct scan','x-ray','xray','radiology','tumor','lesion','retinal','histopathology','microscopy','scan','classify'],
-    'Semantic Segmentation':     ['segmentation','semantic segmentation','pixel-wise','pixel classification','semantic'],
-    'Instance Segmentation':     ['instance segmentation','mask','panoptic','instance'],
-    'Text Classification':       ['text classification','document classification','nlp classification','text','nlp','natural language'],
-    'Sentiment Analysis':        ['sentiment','sentiment analysis','opinion','review','positive negative','emotion'],
-    'Binary Classification':     ['binary classification','fraud detection','spam detection','phishing','classification'],
-    'Regression':                ['regression','price prediction','tabular regression','prediction'],
-    'Forecasting':               ['forecast','forecasting','time series','temporal','demand prediction','energy forecast','timeseries'],
-    'Anomaly Detection':         ['anomaly','anomaly detection','fraud','intrusion','malware','outlier'],
-    'Multiclass Classification': ['multiclass','multi-class','multi class','classification','category'],
-    'Audio Classification':          ['audio classification','sound classification','audio','speech','emotion recognition','ser','sound','acoustic'],
-    'Speech Emotion Recognition':    ['speech emotion','emotion recognition','ser','speech emotion recognition','affective computing','emotion speech'],
-    'Named Entity Recognition':      ['ner','named entity','entity recognition','information extraction'],
-    'Loan Default Prediction':       ['loan','credit','default','fraud detection','financial risk'],
-    'Medical Image Classification':  ['skin','cancer','disease','pathology','dermoscopy','medical','clinical','dermatology','lesion classification'],
-};
+    const targetWords = qu.target.value ? n(qu.target.value).split(/\s+/) : [];
+    const taskWords = qu.task.value ? n(qu.task.value).split(/\s+/) : [];
+    const modalityWords = qu.modality.value ? [n(qu.modality.value)] : [];
+    const keywords = [...qu.explicitKeywords, ...qu.inferredKeywords];
 
-function canonicalizeModality(value: string): string {
-    const v = normalize(value);
-    if (!v) return '';
-    if (/(image|mri|ct|x-ray|xray|radiology|scan|medical|retina|tumor|lesion|microscopy|histopathology|vision)/.test(v)) return 'image';
-    if (/(text|sentiment|review|nlp|document|language|chat|url|webpage)/.test(v)) return 'text';
-    if (/(video|frame|sequence|motion|cctv|surveillance)/.test(v)) return 'video';
-    if (/(audio|speech|sound)/.test(v)) return 'audio';
-    if (/(tabular|csv|table|numeric|structured)/.test(v)) return 'tabular';
-    if (/(time.?series|timeseries|temporal|hourly|daily)/.test(v)) return 'timeseries';
-    return v;
-}
+    const title = n(ds.title ?? ds.name ?? '');
+    const desc = n(ds.description ?? '');
+    const tags = (ds.tags ?? []).map(n).join(' ');
+    const features = (ds.features ?? []).map(n).join(' ');
 
-function computeTaskMatch(dataset: any, projectTasks: string[]): number {
-    const dataBlob = [dataset.name, dataset.title, dataset.description, ...(dataset.tags ?? [])].join(' ');
-    const normalizedDataBlob = normalize(dataBlob);
-    let best = 0;
-    // Split comma/slash/+ joined task strings so each sub-task is matched independently
-    const allTasks: string[] = [];
-    for (const t of projectTasks) {
-        t.split(/[,/+]+/).map((s: string) => s.trim()).filter(Boolean).forEach((s: string) => allTasks.push(s));
+    let score = 0;
+    let maxScore = 0;
+
+    // Target match (highest priority)
+    for (const word of targetWords) {
+        if (word.length < 3) continue;
+        maxScore += titleWeight + tagWeight + descWeight;
+        if (title.includes(word)) score += titleWeight;
+        else if (tags.includes(word)) score += tagWeight;
+        else if (desc.includes(word) || features.includes(word)) score += descWeight;
     }
-    for (const task of allTasks) {
-        const taskNorm = normalize(task);
-        const keywords = TASK_KEYWORDS[task] ?? TASK_KEYWORDS[task.split(' ')[0]] ?? [taskNorm];
-        if (keywords.some((k: string) => normalizedDataBlob.includes(normalize(k)))) { best = 100; break; }
-        const taskWords = taskNorm.split(/\s+/).filter((w: string) => w.length > 3);
-        if (taskWords.length > 0) {
-            const matched = taskWords.filter((w: string) => normalizedDataBlob.includes(w));
-            const partial = matched.length / taskWords.length;
-            if (partial > 0) best = Math.max(best, Math.round(partial * 70));
-        }
+
+    // Task match
+    for (const word of taskWords) {
+        if (word.length < 3) continue;
+        maxScore += titleWeight + tagWeight;
+        if (title.includes(word)) score += titleWeight;
+        else if (tags.includes(word) || desc.includes(word)) score += tagWeight;
     }
-    return best;
+
+    // Modality match
+    for (const word of modalityWords) {
+        if (word.length < 2) continue;
+        maxScore += titleWeight + tagWeight;
+        if (title.includes(word)) score += titleWeight;
+        else if (tags.includes(word) || desc.includes(word)) score += tagWeight;
+    }
+
+    // Additional keyword matches
+    for (const kw of keywords.slice(0, 10)) {
+        if (kw.length < 3) continue;
+        const w = 1;
+        maxScore += w;
+        const allText = `${title} ${tags} ${desc}`;
+        if (allText.includes(n(kw))) score += w;
+    }
+
+    if (maxScore === 0) return 50; // No criteria to match
+    return Math.min(100, Math.round((score / maxScore) * 100));
 }
 
-function computeModalityMatch(datasetModality: string, projectModality: string): number {
-    if (!datasetModality || !projectModality) return 50;
-    const ds = canonicalizeModality(datasetModality);
-    const project = canonicalizeModality(projectModality);
-    if (!ds || !project) return 50;
-    if (ds === project) return 100;
-    if (project === 'video' && ds === 'image') return 70;
+/**
+ * Task match: does the dataset's confirmed task align with the query task?
+ * Uses dataset's evidence-backed task field (not just keyword matching).
+ */
+function scoreTaskMatch(ds: Partial<NormalizedDataset>, qu: QueryUnderstanding): number {
+    const queryTask = n(qu.task.value ?? '');
+    if (!queryTask || queryTask === 'unknown') return 50; // No task specified = neutral
+
+    const dsTask = n(ds.task ?? '');
+    const dsBlob = [ds.title, ds.name, ds.description, ...(ds.tags ?? []), dsTask].map(n).join(' ');
+
+    // Exact task match on confirmed field
+    if (dsTask && dsTask !== 'unknown') {
+        if (dsTask === queryTask) return 100;
+        if (dsTask.includes(queryTask) || queryTask.includes(dsTask)) return 85;
+        // Related tasks
+        if (isRelatedTask(dsTask, queryTask)) return 60;
+    }
+
+    // Keyword match in blob
+    const taskWords = queryTask.split(/\s+/).filter(w => w.length > 3);
+    if (taskWords.length > 0) {
+        const matched = taskWords.filter(w => dsBlob.includes(w)).length;
+        const ratio = matched / taskWords.length;
+        if (ratio >= 0.8) return 80;
+        if (ratio >= 0.5) return 60;
+        if (ratio >= 0.2) return 30;
+    }
+
     return 0;
 }
 
-function computeDomainMatch(datasetDomain: string, projectDomain: string): number {
-    if (!datasetDomain || !projectDomain) return 40;
-    return overlap(datasetDomain, projectDomain) * 100;
-}
-
-function computeSubdomainMatch(dataset: any, projectSubdomain: string): number {
-    if (!projectSubdomain) return 40;
-    const tags = dataset.tags ?? [];
-    const textBlob = [dataset.name, dataset.title, dataset.description, ...tags].filter(Boolean).join(' ');
-    if (!textBlob.trim()) return 40;
-    const score = overlap(textBlob, projectSubdomain) * 100;
-    if (score > 0) return score;
-    const subWords = normalize(projectSubdomain).split(/\s+/).filter((w: string) => w.length > 3);
-    if (subWords.length === 0) return 40;
-    const blobNorm = normalize(textBlob);
-    const matched = subWords.filter((w: string) => blobNorm.includes(w));
-    return matched.length > 0 ? Math.round((matched.length / subWords.length) * 60) : 0;
-}
-
-function computeTargetMatch(dataset: any, targetLabels: string[]): number {
-    if (!targetLabels?.length) return 50;
-    const dataBlob = [dataset.name, dataset.description, ...(dataset.tags ?? [])].join(' ');
-    const matched = targetLabels.filter(l => normalize(dataBlob).includes(normalize(l)));
-    return (matched.length / targetLabels.length) * 100;
-}
-
-// ── Semantic label normalization for target compatibility ──────────────────────
-const LABEL_ALIASES: Record<string, string[]> = {
-    'happy':     ['happiness','joy','joyful','delighted','pleased','cheerful'],
-    'sad':       ['sadness','sorrow','unhappy','grief','depressed','melancholy'],
-    'angry':     ['anger','rage','furious','mad','irritated','enraged'],
-    'fearful':   ['fear','scared','afraid','terror','anxious','frightened'],
-    'surprised': ['surprise','shock','astonished','amazed','startled'],
-    'neutral':   ['calm','boredom','bored','indifferent','serene'],
-    'disgusted': ['disgust','repulsion','revulsion','aversion'],
-    'malignant': ['cancer','malign','melanoma','carcinoma'],
-    'benign':    ['benign','non-cancerous','normal'],
-    'default':   ['defaulted','bad loan','non-performing'],
-};
-
-function normalizeLabel(label: string): string {
-    const l = label.toLowerCase().trim();
-    if (LABEL_ALIASES[l]) return l;
-    for (const [canonical, aliases] of Object.entries(LABEL_ALIASES)) {
-        if (aliases.includes(l)) return canonical;
+function isRelatedTask(a: string, b: string): boolean {
+    const related: [string, string][] = [
+        ['segmentation', 'detection'],
+        ['segmentation', 'instance segmentation'],
+        ['segmentation', 'semantic segmentation'],
+        ['classification', 'recognition'],
+        ['detection', 'object detection'],
+        ['detection', 'localization'],
+        ['robotic manipulation', 'imitation learning'],
+        ['robotic manipulation', 'pick and place'],
+    ];
+    for (const [x, y] of related) {
+        if ((a.includes(x) && b.includes(y)) || (a.includes(y) && b.includes(x))) return true;
     }
-    return l;
+    return false;
 }
 
-export function computeTargetCompatibility(dataset: any, requestedLabels: string[]): {
-    exactMatches: number; relatedMatches: number; missingLabels: string[];
-    additionalLabels: string[]; compatibilityScore: number; requestedCount: number;
-} {
-    if (!requestedLabels || requestedLabels.length === 0) {
-        return { exactMatches: 0, relatedMatches: 0, missingLabels: [], additionalLabels: [], compatibilityScore: 50, requestedCount: 0 };
+/**
+ * Modality match: compares dataset's evidence-backed modality against query modality.
+ * CRITICAL: CT vs tabular = 0. CT vs MRI = 40 (related but different). CT vs CT = 100.
+ */
+function scoreModalityMatch(ds: Partial<NormalizedDataset>, qu: QueryUnderstanding): number {
+    const queryModality = n(qu.modality.value ?? '');
+    if (!queryModality || queryModality === 'unknown') return 50; // No modality specified
+
+    const dsModality = n(ds.modality ?? '');
+    const dsModalities = (ds.modalities ?? []).map(n);
+
+    // Exact match
+    if (dsModality === queryModality || dsModalities.includes(queryModality)) return 100;
+
+    // Partial overlap (e.g., "CT" vs "medical imaging")
+    if (dsModality.includes(queryModality) || queryModality.includes(dsModality)) return 75;
+
+    // Medical imaging family matches
+    const medicalImageModalities = ['ct', 'mri', 'x-ray', 'ultrasound', 'angiography', 'fundus photography', 'dermoscopy', 'medical imaging'];
+    const queryIsMedical = medicalImageModalities.includes(queryModality) || queryModality.includes('medical');
+    const dsIsMedical = medicalImageModalities.some(m => dsModality.includes(m)) || dsModalities.some(m => medicalImageModalities.some(mm => m.includes(mm)));
+
+    if (queryIsMedical && dsIsMedical) {
+        // Both medical but different modalities
+        if (queryModality !== 'medical imaging' && dsModality !== 'medical imaging') return 25;
+        return 40; // At least both medical imaging
     }
-    const dataBlob = normalize([dataset.name, dataset.description, ...(dataset.tags ?? [])].join(' '));
-    const normalizedRequested = requestedLabels.map(l => normalizeLabel(l));
-    let exactMatches = 0; let relatedMatches = 0;
-    const missingLabels: string[] = [];
-    for (let i = 0; i < requestedLabels.length; i++) {
-        const original = requestedLabels[i];
-        const canonical = normalizedRequested[i];
-        const aliases = LABEL_ALIASES[canonical] || [];
-        const allForms = [original.toLowerCase(), canonical, ...aliases];
-        const exactFound = allForms.some(f => dataBlob.includes(normalize(f)));
-        if (exactFound) { exactMatches++; }
-        else {
-            const words = canonical.split(/s+/).filter((w: string) => w.length > 2);
-            const partialFound = words.some((w: string) => dataBlob.includes(w));
-            if (partialFound) { relatedMatches++; }
-            else { missingLabels.push(original); }
-        }
+
+    // Absolute mismatch: imaging vs tabular/text/audio
+    const imagingModalities = ['ct', 'mri', 'x-ray', 'image', 'video', 'dermoscopy', 'medical imaging', 'ultrasound', 'angiography'];
+    const nonImagingModalities = ['tabular', 'text', 'audio', 'time-series'];
+
+    const queryIsImaging = imagingModalities.some(m => queryModality.includes(m));
+    const dsIsNonImaging = nonImagingModalities.some(m => dsModality.includes(m));
+
+    if (queryIsImaging && dsIsNonImaging) return 0; // Hard mismatch
+    if (nonImagingModalities.some(m => queryModality.includes(m)) && imagingModalities.some(m => dsModality.includes(m))) return 0;
+
+    // Check if in ds's modalities list
+    for (const dm of dsModalities) {
+        if (dm.includes(queryModality) || queryModality.includes(dm)) return 60;
     }
-    const covered = exactMatches + relatedMatches * 0.7;
-    const compatibilityScore = Math.round((covered / requestedLabels.length) * 100);
-    return { exactMatches, relatedMatches, missingLabels, additionalLabels: [], compatibilityScore, requestedCount: requestedLabels.length };
+
+    return 15; // Weak match — modality unclear
 }
 
-function computeMetadataScore(dataset: any): number {
-    let score = 0;
-    const bytes = dataset.sizeBytes ?? dataset.size ?? 0;
-    if (bytes && bytes > 0) score += 40;
-    if (dataset.license && normalize(dataset.license) !== 'unknown') score += 30;
-    if (dataset.creator || dataset.author) score += 30;
-    return score;
+/**
+ * Target match: does the dataset contain the specific target entity?
+ * e.g., "coronary arteries" must actually appear in dataset evidence.
+ */
+function scoreTargetMatch(ds: Partial<NormalizedDataset>, qu: QueryUnderstanding): number {
+    const queryTarget = n(qu.target.value ?? '');
+    if (!queryTarget || queryTarget === 'unknown') return 50;
+
+    const dsBlob = [
+        ds.title, ds.name, ds.description,
+        ...(ds.tags ?? []), ...(ds.features ?? []),
+        JSON.stringify(ds.schema ?? {}).slice(0, 200),
+    ].map(n).join(' ');
+
+    // Exact target phrase
+    if (dsBlob.includes(queryTarget)) return 100;
+
+    // Individual target words
+    const targetWords = queryTarget.split(/\s+/).filter(w => w.length > 3);
+    if (targetWords.length === 0) return 50;
+
+    const matched = targetWords.filter(w => dsBlob.includes(w)).length;
+    const ratio = matched / targetWords.length;
+
+    if (ratio === 1.0) return 90;
+    if (ratio >= 0.7) return 70;
+    if (ratio >= 0.5) return 50;
+    if (ratio >= 0.3) return 30;
+    if (ratio > 0) return 15;
+
+    return 0;
 }
 
-/** Convert raw 0-100 component score to proportional value (capped to its max weight).
- *  This way scoreBreakdown.task is out of 30, .modality out of 20, etc.
- *  The UI bar formula (val/max)*100 then gives the correct percentage. */
-function toWeighted(score: number, max: number): number {
-    return Math.min(max, Math.round(score * max / 100));
+/**
+ * Domain/subdomain match
+ */
+function scoreDomainMatch(ds: Partial<NormalizedDataset>, qu: QueryUnderstanding): { domain: number; subdomain: number } {
+    const queryDomain = n(qu.domain.value ?? '');
+    const querySubdomain = n(qu.subdomain.value ?? '');
+
+    const dsBlob = [
+        ds.domain, ds.subdomain, ds.title, ds.name,
+        ds.description?.slice(0, 500), ...(ds.tags ?? [])
+    ].map(n).join(' ');
+
+    let domainScore = 50; // Neutral when unknown
+    if (queryDomain) {
+        const queryDomainWords = queryDomain.split(/\s+/).filter(w => w.length > 3);
+        const matched = queryDomainWords.filter(w => dsBlob.includes(w)).length;
+        domainScore = queryDomainWords.length > 0
+            ? Math.round((matched / queryDomainWords.length) * 100)
+            : 50;
+    }
+
+    let subdomainScore = 50; // Neutral when unknown
+    if (querySubdomain) {
+        const querySubWords = querySubdomain.split(/\s+/).filter(w => w.length > 3);
+        const matched = querySubWords.filter(w => dsBlob.includes(w)).length;
+        subdomainScore = querySubWords.length > 0
+            ? Math.round((matched / querySubWords.length) * 100)
+            : 50;
+    }
+
+    return { domain: domainScore, subdomain: subdomainScore };
 }
 
-export function scoreDataset(dataset: any, project: any): any {
-    const projectTasks = Array.isArray(project.task)
-        ? project.task.filter(Boolean).map(String)
-        : [String(project.task ?? '')].filter(Boolean);
+/**
+ * Metadata quality score (0-100)
+ */
+function scoreMetadataQuality(ds: Partial<NormalizedDataset>): number {
+    return ds.metadataQuality ?? 0;
+}
 
-    // Hard-negative check first — uses zeros since scores not yet computed
-    const hnResult = applyHardNegativeFilter(dataset, project);
-    if (hnResult.rejected) {
+/**
+ * Popularity score (0-100)
+ */
+function scorePopularity(ds: Partial<NormalizedDataset>): number {
+    const downloads = ds.downloads ?? 0;
+    const likes = ds.likes ?? 0;
+    if (downloads > 100000 || likes > 1000) return 100;
+    if (downloads > 10000 || likes > 500) return 80;
+    if (downloads > 1000 || likes > 100) return 60;
+    if (downloads > 100 || likes > 10) return 40;
+    if (downloads > 0 || likes > 0) return 20;
+    return 0;
+}
+
+// ── Score explanation builder ─────────────────────────────────────────────────
+
+function buildScoreExplanation(
+    scores: Record<string, number>,
+    weights: ScoreWeights,
+    qu: QueryUnderstanding,
+    ds: Partial<NormalizedDataset>
+): string {
+    const parts: string[] = [];
+
+    const semScore = scores.semantic ?? 0;
+    const taskScore = scores.task ?? 0;
+    const modScore = scores.modality ?? 0;
+    const targetScore = scores.target ?? 0;
+
+    if (targetScore >= 80) parts.push(`Target match: "${qu.target.value}" confirmed in dataset`);
+    else if (targetScore >= 50) parts.push(`Partial target match: some terms of "${qu.target.value}" found`);
+    else if (qu.target.value && targetScore < 20) parts.push(`Target mismatch: "${qu.target.value}" not found in dataset metadata`);
+
+    if (modScore >= 80) parts.push(`Modality match: ${qu.modality.value} confirmed`);
+    else if (modScore === 0 && qu.modality.state === 'CONFIRMED') parts.push(`Modality mismatch: query requires ${qu.modality.value} but dataset is ${ds.modality ?? 'unknown'}`);
+
+    if (taskScore >= 80) parts.push(`Task match: ${qu.task.value} confirmed`);
+    else if (taskScore === 0 && qu.task.state === 'CONFIRMED') parts.push(`Task mismatch: query requires ${qu.task.value} but dataset task is ${ds.task ?? 'unknown'}`);
+
+    if (semScore >= 70) parts.push(`Strong semantic relevance`);
+    else if (semScore < 30) parts.push(`Weak semantic match`);
+
+    return parts.join('. ') || 'No specific match explanation available.';
+}
+
+// ── Main scoring function ─────────────────────────────────────────────────────
+
+export function scoreDataset(
+    ds: Partial<NormalizedDataset>,
+    qu: QueryUnderstanding
+): Partial<NormalizedDataset> {
+    // Step 1: Hard negative filter
+    // Build a minimal legacy ProjectSpec for backward-compat with hardNegativeFilter
+    const legacySpec = {
+        task: qu.task.value ?? '',
+        data_modality: qu.modality.value ?? '',
+        domain: qu.domain.value ?? '',
+        subdomain: qu.subdomain.value ?? '',
+        target: qu.target.value ?? '',
+        input_type: qu.modality.value ?? '',
+        target_labels: qu.target.value ? [qu.target.value] : [],
+    };
+
+    const hardFilter = applyHardNegativeFilter(ds as any, legacySpec as any);
+    if (hardFilter.rejected) {
         return {
-            ...dataset,
+            ...ds,
             rejected: true,
-            rejectionReason: hnResult.rejectionReason,
+            rejectionReason: hardFilter.rejectionReason ?? 'Hard filter',
             matchScore: 0,
-            scoreBreakdown: { task: 0, modality: 0, domain: 0, subdomain: 0, target: 0, metadata: 0 },
-            matchReason: 'Rejected: ' + hnResult.rejectionReason,
+            scoreBreakdown: { task: 0, modality: 0, domain: 0, subdomain: 0, target: 0, metadata: 0, semantic: 0, quality: 0, popularity: 0 },
+            matchReason: 'Rejected: ' + (hardFilter.rejectionReason ?? 'incompatible with query'),
         };
     }
 
-    // Compute all component scores (0-100 each)
-    const taskScore      = computeTaskMatch(dataset, projectTasks);
-    const modalityScore  = computeModalityMatch(dataset.modality ?? dataset.dataType ?? '', project.data_modality ?? '');
-    const domainScore    = computeDomainMatch(dataset.domain ?? '', project.domain ?? '');
-    const subdomainScore = computeSubdomainMatch(dataset, project.subdomain ?? '');
-    const metadataScore  = computeMetadataScore(dataset);
-    const targetCompatibility = computeTargetCompatibility(dataset, project.target_labels ?? []);
-    // Classification tasks weight label compatibility more heavily (20% vs 10%)
-    const isClassificationTask = /classif|emotion|sentiment|categor|ser|audio class/i.test(String(project.task||''));
-    const taskW    = isClassificationTask ? 0.25 : 0.30;
-    const targetW  = isClassificationTask ? 0.20 : 0.10;
-    const domainW  = isClassificationTask ? 0.10 : 0.20;
-    const subdomW  = isClassificationTask ? 0.10 : 0.15;
+    // Step 2: Compute adaptive weights
+    const weights = computeAdaptiveWeights(qu);
+
+    // Step 3: Compute individual component scores
+    const semScore = scoreSemanticRelevance(ds, qu);
+    const taskScore = scoreTaskMatch(ds, qu);
+    const modalityScore = scoreModalityMatch(ds, qu);
+    const targetScore = scoreTargetMatch(ds, qu);
+    const { domain: domainScore, subdomain: subdomainScore } = scoreDomainMatch(ds, qu);
+    const metaScore = scoreMetadataQuality(ds);
+    const popularityScore = scorePopularity(ds);
+
+    const scores = {
+        semantic: semScore,
+        task: taskScore,
+        modality: modalityScore,
+        target: targetScore,
+        domain: domainScore,
+        subdomain: subdomainScore,
+        metadata: metaScore,
+        popularity: popularityScore,
+    };
+
+    // Step 4: Weighted final score
     const finalScore = Math.min(100, Math.round(
-        taskScore * taskW + modalityScore * 0.20 +
-        targetCompatibility.compatibilityScore * targetW +
-        domainScore * domainW + subdomainScore * subdomW +
-        metadataScore * 0.05
+        semScore       * (weights.semantic   / 100) +
+        taskScore      * (weights.task       / 100) +
+        modalityScore  * (weights.modality   / 100) +
+        targetScore    * (weights.target     / 100) +
+        domainScore    * (weights.domain     / 100) +
+        subdomainScore * (weights.subdomain  / 100) +
+        metaScore      * (weights.metadata   / 100) +
+        popularityScore * (weights.popularity / 100)
     ));
-    const matchReason = buildMatchReason(taskScore, modalityScore, domainScore, subdomainScore, targetCompatibility, projectTasks);
+
+    // Step 5: Critical mismatch penalty
+    // If modality was explicitly stated AND there's a hard mismatch, cap the score
+    const hardModalityMismatch = qu.modality.state === 'CONFIRMED' && modalityScore === 0;
+    const hardTaskMismatch = qu.task.state === 'CONFIRMED' && taskScore === 0;
+    const penalizedScore = hardModalityMismatch || hardTaskMismatch
+        ? Math.min(finalScore, 25) // Cap at 25 — can still be shown as "related" but never "best match"
+        : finalScore;
+
+    const scoreBreakdown = {
+        semantic: Math.round(semScore * weights.semantic / 100),
+        task: Math.round(taskScore * weights.task / 100),
+        modality: Math.round(modalityScore * weights.modality / 100),
+        target: Math.round(targetScore * weights.target / 100),
+        domain: Math.round(domainScore * weights.domain / 100),
+        subdomain: Math.round(subdomainScore * weights.subdomain / 100),
+        metadata: Math.round(metaScore * weights.metadata / 100),
+        quality: Math.round(metaScore * weights.metadata / 100),
+        popularity: Math.round(popularityScore * weights.popularity / 100),
+    };
+
+    const matchReason = buildScoreExplanation(scores, weights, qu, ds);
 
     return {
-        ...dataset,
+        ...ds,
         rejected: false,
-        matchScore: finalScore,
-        scoreBreakdown: {
-            task:      toWeighted(taskScore,                              isClassificationTask?25:30),
-            modality:  toWeighted(modalityScore,                          20),
-            target:    toWeighted(targetCompatibility.compatibilityScore, isClassificationTask?20:10),
-            domain:    toWeighted(domainScore,                            isClassificationTask?10:20),
-            subdomain: toWeighted(subdomainScore,                         isClassificationTask?10:15),
-            metadata:  toWeighted(metadataScore,                          5),
-        },
+        rejectionReason: null,
+        matchScore: penalizedScore,
+        scoreBreakdown,
         matchReason,
-        targetCompatibility,
     };
-}
-
-function buildMatchReason(task: number, modality: number, domain: number, subdomain: number, tc: ReturnType<typeof computeTargetCompatibility>, tasks: string[]): string {
-    const parts: string[] = [];
-    if (task >= 80)      parts.push('strong task alignment (' + tasks.join(' + ') + ': ' + task + '%)');
-    else if (task >= 50) parts.push('partial task match (' + task + '%)');
-    else                 parts.push('weak task match (' + task + '%)');
-    if (modality >= 80)  parts.push('modality confirmed');
-    if (domain >= 70)    parts.push('domain confirmed');
-    if(tc.requestedCount>0){if(tc.exactMatches===tc.requestedCount)parts.push('all '+tc.requestedCount+' labels found');else if(tc.exactMatches+tc.relatedMatches>0)parts.push((tc.exactMatches+tc.relatedMatches)+'/'+tc.requestedCount+' labels matched');else parts.push('labels not confirmed in metadata');}
-    return parts.join(', ');
 }

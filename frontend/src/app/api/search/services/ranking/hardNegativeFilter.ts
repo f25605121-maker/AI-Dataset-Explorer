@@ -1,10 +1,13 @@
 /**
- * Hard-Negative Filtering
- * 
- * Rejects datasets that are fundamentally incompatible with the project task/domain/modality.
- * A hard-negative dataset gets score = 0 regardless of keyword overlap.
- * 
- * Rules are applied BEFORE scoring so no keyword similarity can override them.
+ * Hard-Negative Filter
+ *
+ * Rejects datasets that are FUNDAMENTALLY incompatible with the query.
+ * Called before scoring — no keyword similarity can override these rules.
+ *
+ * KEY ADDITIONS over previous version:
+ * - Tabular health survey datasets are rejected for CT/MRI/imaging queries
+ * - "Heart Disease Health Indicators Dataset" type datasets rejected for imaging queries
+ * - More precise medical imaging sub-modality exclusions
  */
 
 export interface HardNegativeResult {
@@ -12,176 +15,187 @@ export interface HardNegativeResult {
     rejectionReason?: string;
 }
 
-// ── Domain exclusion pairs ────────────────────────────────────────────────────
-// [projectDomainKeyword, incompatibleDatasetKeyword]
-const DOMAIN_EXCLUSION_PAIRS: [string, string][] = [
-    // Manufacturing defect detection vs medical imaging
-    ['industrial defect', 'mri'],
-    ['industrial defect', 'ct'],
-    ['industrial defect', 'x-ray'],
-    ['industrial defect', 'radiology'],
-    ['industrial defect', 'medical imaging'],
-    ['manufacturing', 'mri'],
-    ['manufacturing', 'ct'],
-    ['manufacturing', 'radiology'],
-    ['quality inspection', 'mri'],
-    ['quality inspection', 'medical imaging'],
-    ['surface defect', 'mri'],
-    ['surface defect', 'medical imaging'],
-    ['defect detection', 'mri'],
-    ['defect detection', 'ct'],
-    ['defect detection', 'x-ray'],
-    ['defect detection', 'radiology'],
-    ['inspection', 'mri'],
-    ['inspection', 'radiology'],
-    // Medical vs non-medical
-    ['mri', 'cctv'],
-    ['mri', 'traffic'],
-    ['mri', 'vehicle'],
-    ['mri', 'skin lesion'],
-    ['mri', 'dermoscop'],
-    ['mri', 'retinal'],
-    ['brain tumor', 'skin'],
-    ['brain tumor', 'vehicle'],
-    ['brain tumor', 'traffic'],
-    ['dermatology', 'mri'],
-    ['dermatology', 'traffic'],
-    ['dermatology', 'vehicle'],
-    ['skin disease', 'traffic'],
-    ['skin disease', 'vehicle'],
-    ['skin disease', 'brain'],
-    ['chest x-ray', 'skin'],
-    ['chest x-ray', 'vehicle'],
-    ['chest x-ray', 'traffic'],
-    // Vehicle vs medical
-    ['vehicle', 'mri'],
-    ['vehicle', 'brain tumor'],
-    ['vehicle', 'skin lesion'],
-    ['vehicle', 'dermoscop'],
-    ['vehicle', 'chest x-ray'],
-    ['traffic', 'mri'],
-    ['traffic', 'brain'],
-    ['traffic', 'dermoscop'],
-    ['traffic', 'skin lesion'],
-    // Text vs vision
-    ['sentiment', 'image'],
-    ['sentiment', 'video'],
-    ['sentiment', 'mri'],
-    ['sentiment', 'vehicle'],
-    ['text classification', 'cctv'],
-    ['text classification', 'image classification'],
-    ['nlp', 'vehicle detection'],
-    ['nlp', 'mri'],
-    // Vision vs tabular
-    ['object detection', 'tabular'],
-    ['image classification', 'csv'],
-    ['image segmentation', 'tabular'],
-    // Time-series vs unrelated
-    ['time series', 'image'],
-    ['time series', 'video'],
-    ['time series', 'mri'],
-    ['forecasting', 'image'],
-    ['forecasting', 'video'],
-    // Speech vs vision
-    ['speech recognition', 'image'],
-    ['speech recognition', 'vehicle'],
-    ['speech recognition', 'mri'],
-    // Satellite vs medical
-    ['remote sensing', 'mri'],
-    ['remote sensing', 'skin'],
-    ['satellite', 'mri'],
-    ['satellite', 'sentiment'],
-];
-
-// ── Modality exclusion pairs ─────────────────────────────────────────────────
-// [projectModality, incompatibleDatasetModality]
-const MODALITY_EXCLUSION_PAIRS: [string, string][] = [
-    ['video', 'tabular'],
-    ['video', 'text'],
-    ['video', 'audio'],
-    ['image', 'tabular'],
-    ['image', 'text'],
-    ['image', 'time-series'],
-    ['text', 'image'],
-    ['text', 'video'],
-    ['text', 'audio'],
-    ['tabular', 'image'],
-    ['tabular', 'video'],
-    ['tabular', 'audio'],
-    ['audio', 'image'],
-    ['audio', 'video'],
-    ['audio', 'tabular'],
-    ['time-series', 'image'],
-    ['time-series', 'video'],
-    ['time-series', 'text'],
-];
-
-function normalize(s: string): string {
+function n(s: string): string {
     return (s ?? '').toLowerCase().trim();
 }
 
-function containsAny(text: string, keywords: string[]): boolean {
-    const t = normalize(text);
-    return keywords.some(k => t.includes(normalize(k)));
+function contains(text: string, keywords: string[]): boolean {
+    const t = n(text);
+    return keywords.some(k => t.includes(n(k)));
 }
 
+// ── Tabular health survey detection ──────────────────────────────────────────
+
+const TABULAR_HEALTH_SURVEY_SIGNALS = [
+    'health indicator',
+    'health survey',
+    'cdc',
+    'nhanes',
+    'brfss',
+    'clinical trial data',
+    'patient survey',
+    'questionnaire',
+    'health risk',
+    'risk factor',
+    'lifestyle',
+    'bmi',
+    'cholesterol',
+    'blood pressure',
+    'blood glucose',
+    'metabolic',
+    'tabular health',
+    'health record',
+    'ehr',
+    'electronic health',
+    'structured health',
+];
+
+const IMAGING_QUERY_SIGNALS = [
+    'ct',
+    'cta',
+    'computed tomography',
+    'mri',
+    'magnetic resonance',
+    'x-ray',
+    'radiograph',
+    'ultrasound',
+    'angiograph',
+    'fundus',
+    'dermoscop',
+    'medical imaging',
+    'scan',
+    'dicom',
+    'radiology',
+    'imaging',
+    'coronary ct',
+    'cardiac ct',
+    'brain mri',
+    'chest x-ray',
+    'segmentation',  // segmentation almost always implies imaging
+];
+
+// ── Domain exclusion pairs ────────────────────────────────────────────────────
+const DOMAIN_EXCLUSION_PAIRS: [string, string][] = [
+    // Industrial / manufacturing vs medical
+    ['industrial defect', 'mri'], ['industrial defect', 'ct'], ['industrial defect', 'radiology'],
+    ['manufacturing', 'mri'], ['manufacturing', 'ct'], ['manufacturing', 'radiology'],
+    ['quality inspection', 'mri'], ['quality inspection', 'medical imaging'],
+    ['surface defect', 'mri'], ['surface defect', 'medical imaging'],
+    ['defect detection', 'mri'], ['defect detection', 'ct'], ['defect detection', 'x-ray'],
+    // Medical vs automotive/traffic
+    ['mri', 'cctv'], ['mri', 'traffic'], ['mri', 'vehicle'],
+    ['brain tumor', 'vehicle'], ['brain tumor', 'traffic'],
+    ['chest x-ray', 'vehicle'], ['chest x-ray', 'traffic'],
+    ['coronary', 'vehicle'], ['coronary', 'traffic'], ['coronary', 'autonomous'],
+    // Medical imaging vs text/nlp
+    ['mri', 'sentiment'], ['mri', 'text classification'], ['mri', 'review'],
+    ['ct scan', 'sentiment'], ['ct scan', 'text'], ['ct scan', 'review'],
+    ['coronary', 'sentiment'], ['coronary', 'review'], ['coronary', 'nlp'],
+    // Vision vs tabular (direct)
+    ['segmentation', 'tabular'], ['object detection', 'tabular'],
+    ['image classification', 'csv only'],
+    // Speech/audio vs vision
+    ['speech recognition', 'image classification'], ['speech recognition', 'mri'],
+    ['audio classification', 'mri'], ['audio classification', 'vehicle detection'],
+    // Satellite/remote sensing vs medical
+    ['remote sensing', 'mri'], ['satellite', 'mri'], ['satellite', 'sentiment'],
+    // Finance vs medical/vision
+    ['credit', 'mri'], ['fraud detection', 'mri'], ['stock market', 'mri'],
+    // Agriculture vs finance/medical
+    ['agriculture', 'stock market'], ['agriculture', 'mri'], ['crop', 'banking'],
+    // Robotics vs text/sentiment
+    ['robotics', 'sentiment'], ['robotics', 'text classification'],
+    ['robot', 'sentiment'], ['robot', 'text classification'],
+    // Autonomous driving vs sentiment
+    ['autonomous driving', 'sentiment'], ['self-driving', 'sentiment'],
+    ['autonomous driving', 'nlp'], ['self-driving', 'text classification'],
+];
+
+// ── Modality exclusion pairs ──────────────────────────────────────────────────
+const MODALITY_EXCLUSION_PAIRS: [string, string][] = [
+    ['ct', 'tabular'], ['ct', 'text'], ['ct', 'audio'],
+    ['mri', 'tabular'], ['mri', 'text'], ['mri', 'audio'],
+    ['x-ray', 'tabular'], ['x-ray', 'text'], ['x-ray', 'audio'],
+    ['image', 'audio'], ['image', 'time-series'],
+    ['video', 'tabular'], ['video', 'text'], ['video', 'audio'],
+    ['text', 'image'], ['text', 'video'], ['text', 'audio'],
+    ['tabular', 'image'], ['tabular', 'video'], ['tabular', 'audio'],
+    ['audio', 'image'], ['audio', 'video'], ['audio', 'tabular'],
+    ['time-series', 'image'], ['time-series', 'video'],
+    ['robotics', 'text'], ['robotics', 'tabular'], ['robotics', 'audio'],
+];
+
+// ── Import types ──────────────────────────────────────────────────────────────
+import type { NormalizedDataset, ProjectSpec } from '../../schemas/types';
+
+// ── Main filter ───────────────────────────────────────────────────────────────
+
 export function applyHardNegativeFilter(
-    dataset: {
-        name?: string;
-        title?: string;
-        description?: string;
-        tags?: string[];
-        task?: string;
-        modality?: string;
-        domain?: string;
-    },
-    project: {
-        task?: string | string[];
-        data_modality?: string;
-        domain?: string;
-        subdomain?: string;
-        input_type?: string;
-    }
+    dataset: Partial<NormalizedDataset>,
+    project: Partial<ProjectSpec>
 ): HardNegativeResult {
     // Build searchable blobs
-    const datasetBlob = [
-        dataset.name,
-        dataset.title,
-        dataset.description,
-        ...(dataset.tags ?? []),
-        dataset.task,
-        dataset.modality,
-        dataset.domain,
+    const dsBlob = [
+        dataset.name, dataset.title, dataset.description?.slice(0, 500),
+        ...(dataset.tags ?? []), dataset.task, dataset.modality, dataset.domain,
     ].filter(Boolean).join(' ');
 
-    const projectTaskArr = Array.isArray(project.task) ? project.task : [project.task ?? ''];
+    const projectTasks = Array.isArray(project.task) ? project.task : [project.task ?? ''];
     const projectBlob = [
-        ...projectTaskArr,
-        project.data_modality,
-        project.domain,
-        project.subdomain,
-        project.input_type,
+        ...projectTasks,
+        project.data_modality, project.domain, project.subdomain,
+        project.input_type, project.target,
     ].filter(Boolean).join(' ');
 
-    // Whitelist: Manufacturing projects with manufacturing datasets should NOT be rejected
-    const isManufacturingProject = containsAny(projectBlob, ['manufacturing', 'industrial', 'defect', 'quality control', 'inspection']);
-    const isManufacturingDataset = containsAny(datasetBlob, ['mvtec', 'dagm', 'kolektor', 'industrial', 'manufacturing', 'defect']);
-    if (isManufacturingProject && isManufacturingDataset) {
-        return { rejected: false };
+    // ── Whitelist checks (pass through without rejection) ─────────────────
+
+    // Manufacturing project + manufacturing dataset → allow
+    const isManufacturingProject = contains(projectBlob, ['manufacturing', 'industrial', 'defect', 'quality control', 'inspection']);
+    const isManufacturingDataset = contains(dsBlob, ['mvtec', 'dagm', 'kolektor', 'industrial', 'manufacturing', 'defect']);
+    if (isManufacturingProject && isManufacturingDataset) return { rejected: false };
+
+    // Medical imaging project + medical imaging dataset → allow
+    const isMedicalProject = contains(projectBlob, ['medical', 'mri', 'ct', 'x-ray', 'radiology', 'tumor', 'lesion', 'diagnosis', 'coronary', 'cardiac', 'brain', 'patholog']);
+    const isMedicalImageDataset = contains(dsBlob, ['medical', 'mri', 'ct scan', 'x-ray', 'radiology', 'tumor', 'patholog', 'dicom', 'coronary', 'cardiac', 'echocardiograph', 'ultrasound', 'fundus', 'dermoscop']);
+    if (isMedicalProject && isMedicalImageDataset) return { rejected: false };
+
+    // Robotics project + robotics dataset → allow
+    const isRoboticsProject = contains(projectBlob, ['robot', 'manipulation', 'teleoperat', 'so-101', 'lerobot', 'grasping']);
+    const isRoboticsDataset = contains(dsBlob, ['robot', 'manipulation', 'teleoperat', 'so-101', 'lerobot', 'grasping', 'pick', 'place']);
+    if (isRoboticsProject && isRoboticsDataset) return { rejected: false };
+
+    // ── KEY FIX: Tabular health survey rejection for imaging queries ───────
+    //
+    // This catches the "Heart Disease Health Indicators Dataset" problem.
+    // If the query asks for imaging (CT/MRI/segmentation/etc.) but the dataset
+    // is a tabular health survey, reject it.
+    //
+    const queryAsksForImaging = contains(projectBlob, IMAGING_QUERY_SIGNALS);
+    const datasetIsTabularHealthSurvey = contains(dsBlob, TABULAR_HEALTH_SURVEY_SIGNALS);
+
+    if (queryAsksForImaging && datasetIsTabularHealthSurvey) {
+        return {
+            rejected: true,
+            rejectionReason: 'Tabular health survey dataset rejected for imaging/segmentation query. ' +
+                'Dataset appears to be a structured health-indicator survey, not an imaging dataset.',
+        };
     }
 
-    // Whitelist: Medical projects with medical datasets should NOT be rejected
-    const isMedicalProject = containsAny(projectBlob, ['medical', 'mri', 'ct', 'x-ray', 'radiology', 'tumor', 'lesion', 'diagnosis']);
-    const isMedicalDataset = containsAny(datasetBlob, ['medmnist', 'chest x-ray', 'brain tumor', 'medical', 'mri', 'radiology']);
-    if (isMedicalProject && isMedicalDataset) {
-        return { rejected: false };
+    // Additionally reject tabular-modality datasets for imaging queries
+    const dsModality = n(dataset.modality ?? '');
+    const dsIsTabular = dsModality === 'tabular' || contains(dsBlob, ['csv file', 'spreadsheet', 'structured data', 'tabular data']);
+    if (queryAsksForImaging && dsIsTabular) {
+        return {
+            rejected: true,
+            rejectionReason: `Modality mismatch: imaging query requires imaging data but dataset is tabular.`,
+        };
     }
 
-    // 1. Domain-pair exclusion
+    // ── Domain exclusion pairs ─────────────────────────────────────────────
     for (const [projKeyword, dataKeyword] of DOMAIN_EXCLUSION_PAIRS) {
         if (
-            containsAny(projectBlob, [projKeyword]) &&
-            containsAny(datasetBlob, [dataKeyword])
+            contains(projectBlob, [projKeyword]) &&
+            contains(dsBlob, [dataKeyword])
         ) {
             return {
                 rejected: true,
@@ -190,19 +204,18 @@ export function applyHardNegativeFilter(
         }
     }
 
-    // 2. Modality-pair exclusion
-    const projectModality = normalize(project.data_modality ?? '');
-    const datasetModality = normalize(dataset.modality ?? dataset.task ?? '');
+    // ── Modality exclusion pairs ───────────────────────────────────────────
+    const projectModality = n(project.data_modality ?? '');
+    const datasetModality = n(dataset.modality ?? '');
 
-    for (const [projMod, dataMod] of MODALITY_EXCLUSION_PAIRS) {
-        if (
-            projectModality.includes(projMod) &&
-            datasetModality.includes(dataMod)
-        ) {
-            return {
-                rejected: true,
-                rejectionReason: `Modality mismatch: project uses '${projectModality}' data but dataset is '${datasetModality}'.`,
-            };
+    if (projectModality && datasetModality && projectModality !== 'unknown' && datasetModality !== 'unknown') {
+        for (const [projMod, dataMod] of MODALITY_EXCLUSION_PAIRS) {
+            if (projectModality.includes(projMod) && datasetModality.includes(dataMod)) {
+                return {
+                    rejected: true,
+                    rejectionReason: `Modality mismatch: project uses '${projectModality}' but dataset is '${datasetModality}'.`,
+                };
+            }
         }
     }
 

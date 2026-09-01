@@ -1,148 +1,240 @@
-import { NormalizedDataset, ProjectSpec } from '../../schemas/types';
+/**
+ * Kaggle Dataset Search — Query-Understanding-Driven
+ *
+ * Uses structured QueryUnderstanding to build targeted search queries
+ * instead of relying on LLM-generated ProjectSpec fields.
+ */
 
-function buildKaggleQueries(spec: ProjectSpec, rawQuery?: string): string[] {
-    const task = String(spec.task || '');
-    const domain = String(spec.domain || '');
-    const subdomain = String(spec.subdomain || '');
-    const modality = String(spec.data_modality || '');
-    const labels = Array.isArray(spec.target_labels) ? spec.target_labels.slice(0, 3).join(' ') : '';
-    const title = String(spec.title || '');
+import type { NormalizedDataset } from '../../schemas/types';
+import type { QueryUnderstanding } from '../queryUnderstanding/queryParser';
+import type { ExpandedQueries } from '../queryUnderstanding/queryExpander';
+import { searchResultCache, searchKey } from '../cache/metadataCache';
 
-    // Extract meaningful keywords from the raw user query to use as the most specific search
-    const STOP = new Set(['i','want','to','find','a','an','the','dataset','datasets','on','for','about','with','using','that','this','my','me','can','please','need','looking','get','use','build','create','make','train','model','data','some','good','best','related']);
-    const rawKeywords = rawQuery
-        ? rawQuery.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w))
-        : [];
-    const rawPhrase  = rawKeywords.slice(0, 4).join(' ');
-    const rawBigram  = rawKeywords.slice(0, 2).join(' ');
+const KAGGLE_API = 'https://www.kaggle.com/api/v1/datasets/list';
 
-    // Primary: task + domain combo — most specific
-    const q1 = [task.replace(/,/g, ' '), subdomain].filter(Boolean).join(' ').trim();
-    // Secondary: domain + modality
-    const q2 = [domain, modality].filter(Boolean).join(' ').trim();
-    // Tertiary: title keywords
-    const q3 = title.replace(/[^a-zA-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-    // Task-specific extras
-    const taskLower = task.toLowerCase();
-    const domainLower = domain.toLowerCase();
-    const extras: string[] = [];
-    if (taskLower.includes('detect') || taskLower.includes('tracking')) {
-        extras.push([labels, 'object detection dataset'].filter(Boolean).join(' ').trim());
-        if (subdomain) extras.push(subdomain + ' dataset');
-    } else if (taskLower.includes('segment')) {
-        extras.push([subdomain, 'segmentation'].join(' ').trim());
-    } else if (domainLower.includes('nlp') || domainLower.includes('natural language')) {
-        extras.push(subdomain + ' text classification');
-    } else if (domainLower.includes('medical') || domainLower.includes('healthcare')) {
-        extras.push([subdomain, modality, 'dataset'].join(' ').trim());
-    } else if (taskLower.includes('forecast') || taskLower.includes('time')) {
-        extras.push(subdomain + ' time series');
-    } else if (domainLower.includes('audio') || modality.toLowerCase().includes('audio') || modality.toLowerCase().includes('speech') || taskLower.includes('speech') || taskLower.includes('audio') || taskLower.includes('emotion recognition') || taskLower.includes('ser')) {
-        extras.push('speech emotion recognition dataset');
-        extras.push([labels, 'audio classification'].filter(Boolean).join(' ').trim());
-        if (subdomain) extras.push(subdomain + ' audio dataset');
-    } else if (modality.toLowerCase().includes('tabular') || domainLower.includes('finance')) {
-        extras.push([subdomain, 'tabular dataset'].join(' ').trim());
-    }
-
-    // Raw query phrases come first — they are the most specific and most likely to match
-    const all = [rawPhrase, rawBigram, q1, q2, q3, ...extras].filter(q => q && q.length > 5);
-    return Array.from(new Set(all)).slice(0, 5);
+interface FetchDiagnostics {
+    networkFailures: number;
 }
 
-export async function searchKaggleDatasets(spec: ProjectSpec, trace?: any, rawQuery?: string): Promise<Partial<NormalizedDataset>[]> {
+async function kaggleFetch(url: string, auth: string, timeoutMs: number, diagnostics?: FetchDiagnostics): Promise<Response | null> {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            headers: { Authorization: `Basic ${auth}` },
+            signal: ctrl.signal,
+            cache: 'no-store',
+        });
+        clearTimeout(tid);
+        return res;
+    } catch (e: any) {
+        clearTimeout(tid);
+        if (diagnostics) diagnostics.networkFailures += 1;
+        if (process.env.DEBUG_API_TRACE === 'true') {
+            console.warn('[KAGGLE] fetch error', e?.message?.slice(0, 60));
+        }
+        return null;
+    }
+}
+
+// ── Modality inference from Kaggle tags/title ─────────────────────────────────
+
+function inferKaggleModality(title: string, desc: string, tags: string[]): string {
+    const blob = [title, desc, ...tags].join(' ').toLowerCase();
+    if (/\bct\b|computed.?tomograph|\bcta\b|cardiac.?ct/i.test(blob)) return 'CT';
+    if (/\bmri\b|magnetic.?resonance/i.test(blob)) return 'MRI';
+    if (/x.?ray|radiograph/i.test(blob)) return 'X-ray';
+    if (/ultrasound/i.test(blob)) return 'ultrasound';
+    if (/dermoscop/i.test(blob)) return 'dermoscopy';
+    if (/fundus|retinal/i.test(blob)) return 'fundus photography';
+    if (/angiograph/i.test(blob)) return 'angiography';
+    if (/\bvideo\b|\bmp4\b|\bavi\b/i.test(blob)) return 'video';
+    if (/\baudio\b|\bwav\b|\bmp3\b|speech/i.test(blob)) return 'audio';
+    if (/\btabular\b|\bcsv\b|\bspreadsheet\b/i.test(blob)) return 'tabular';
+    // Survey / health indicator datasets = tabular unless imaging keywords present
+    if (/health.?indicator|survey|questionnaire|clinical.?trial|patient.?record|ehr/i.test(blob)) return 'tabular';
+    if (/\bimage\b|\bphoto\b|\bpng\b|\bjpeg\b/i.test(blob)) return 'image';
+    if (/\btext\b|\bnlp\b|\bdocument\b/i.test(blob)) return 'text';
+    return 'unknown';
+}
+
+function inferKaggleTask(title: string, desc: string, tags: string[]): string {
+    const blob = [title, desc, ...tags].join(' ').toLowerCase();
+    if (/segment(?:ation)?/i.test(blob)) return 'segmentation';
+    if (/object\s*detect/i.test(blob)) return 'object detection';
+    if (/classif(?:y|ication)/i.test(blob)) return 'classification';
+    if (/detect(?:ion)?/i.test(blob)) return 'detection';
+    if (/predict/i.test(blob)) return 'prediction';
+    if (/regression/i.test(blob)) return 'regression';
+    if (/forecast/i.test(blob)) return 'forecasting';
+    if (/recogni/i.test(blob)) return 'recognition';
+    return 'unknown';
+}
+
+// ── Main search function ──────────────────────────────────────────────────────
+
+export async function searchKaggleDatasets(
+    qu: QueryUnderstanding,
+    expanded: ExpandedQueries,
+    trace?: Record<string, unknown>
+): Promise<Partial<NormalizedDataset>[]> {
     const KAGGLE_USERNAME = process.env.KAGGLE_USERNAME;
     const KAGGLE_KEY = process.env.KAGGLE_KEY;
+    const TRACE = process.env.DEBUG_API_TRACE === 'true';
+    const TIMEOUT = parseInt(process.env.EXTERNAL_API_TIMEOUT_MS || '15000', 10);
 
     if (!KAGGLE_USERNAME || !KAGGLE_KEY) {
-        if (trace) { trace.called = false; trace.success = false; trace.reason = 'KAGGLE_USERNAME or KAGGLE_KEY not in .env.local'; }
-        if (process.env.DEBUG_API_TRACE === 'true') console.log('[API-TRACE] Kaggle NOT_CONFIGURED — missing credentials');
+        if (trace) { trace.called = false; trace.success = false; trace.reason = 'KAGGLE_USERNAME or KAGGLE_KEY not configured'; }
+        if (TRACE) console.log('[KAGGLE] NOT_CONFIGURED');
         return [];
     }
 
-    const TRACE = process.env.DEBUG_API_TRACE === 'true';
-    const queries = buildKaggleQueries(spec, rawQuery);
-    const auth = Buffer.from(KAGGLE_USERNAME + ':' + KAGGLE_KEY).toString('base64');
-    let results: Partial<NormalizedDataset>[] = [];
-    let overallStatus = -1; // -1 = no request attempted yet; set to real HTTP status on first response
-    const t0 = performance.now();
+    const auth = Buffer.from(`${KAGGLE_USERNAME}:${KAGGLE_KEY}`).toString('base64');
+    if (trace) { trace.called = true; trace.success = false; }
 
-    if (trace) trace.called = true;
-    if (TRACE) console.log('[API-TRACE] Kaggle START queries=' + JSON.stringify(queries));
+    const queries = expanded.kaggleDatasetQueries;
+    if (TRACE) console.log('[KAGGLE] START queries=', JSON.stringify(queries));
+
+    const t0 = performance.now();
+    const rawResults: any[] = [];
+    let httpStatus: number | null = null;
+    const diagnostics: FetchDiagnostics = { networkFailures: 0 };
 
     for (const q of queries) {
+        if (!q || q.trim().length < 3) continue;
+
+        const cacheKey = searchKey('kaggle', q);
+        const cached = searchResultCache.get(cacheKey);
+        if (cached !== null) {
+            rawResults.push(...(cached as any[]));
+            continue;
+        }
+
+        const url = `${KAGGLE_API}?search=${encodeURIComponent(q)}&sortBy=relevance&pageSize=20`;
+        const res = await kaggleFetch(url, auth, TIMEOUT, diagnostics);
+        if (!res) continue;
+
+        httpStatus = res.status;
+
+        if (!res.ok) {
+            httpStatus = res.status;
+            if (TRACE) console.warn('[KAGGLE] failed status=', res.status, 'q=', q);
+            continue;
+        }
         try {
-            const url = 'https://www.kaggle.com/api/v1/datasets/list?search=' + encodeURIComponent(q) + '&sortBy=relevance&pageSize=20';
-            if (TRACE) console.log('[API-TRACE] Kaggle REQUEST GET ' + url.replace('https://www.kaggle.com', ''));
-            const KAGGLE_TIMEOUT = parseInt(process.env.EXTERNAL_API_TIMEOUT_MS || '15000', 10);
-            const kCtrl = new AbortController();
-            const kTid = setTimeout(() => kCtrl.abort(), KAGGLE_TIMEOUT);
-            let res: Response;
-            try {
-                res = await fetch(url, { headers: { 'Authorization': 'Basic ' + auth }, signal: kCtrl.signal });
-            } catch (fe: any) {
-                clearTimeout(kTid);
-                if (fe.name === 'AbortError') { overallStatus = 408; if (TRACE) console.warn('[API-TRACE] Kaggle TIMEOUT query=' + q); continue; }
-                if (TRACE) console.warn('[API-TRACE] Kaggle NETWORK_ERROR query=' + q); continue;
-            }
-            clearTimeout(kTid);
-            if (!res.ok) {
-                overallStatus = res.status;
-                if (TRACE) console.warn('[API-TRACE] Kaggle FAILED status=' + res.status + ' query=' + q);
-            } else {
-                const data = await res.json();
-                const datasets = (data || []).map((item: any) => ({
-                    id: item.ref,
-                    name: item.title,
-                    title: item.title,
-                    subtitle: item.subtitle || '',
-                    source: 'Kaggle' as const,
-                    url: 'https://www.kaggle.com/datasets/' + item.ref,
-                    description: item.subtitle || item.description || '',
-                    domain: spec.domain,
-                    subdomain: spec.subdomain,
-                    modality: spec.data_modality,
-                    tasks: [spec.task],
-                    targetLabels: spec.target_labels || [],
-                    sizeBytes: item.totalBytes || null,
-                    license: item.licenseName || 'Unknown',
-                    creator: item.creatorName || 'Unknown',
-                    creatorName: item.creatorName || 'Unknown',
-                    downloads: item.downloadCount || 0,
-                    tags: (item.tags || []).map((t: any) => (typeof t === 'string' ? t : t?.name || '')).filter(Boolean),
-                    files: [],
-                    metadataQuality: 0,
-                    matchScore: 0,
-                    scoreBreakdown: { task: 0, modality: 0, domain: 0, subdomain: 0, target: 0, metadata: 0 },
-                    rejected: false,
-                    rejectionReason: null,
-                    matchReason: ''
-                }));
-                results = [...results, ...datasets];
-                if (TRACE) console.log('[API-TRACE] Kaggle RESPONSE status=200 query=' + JSON.stringify(q) + ' found=' + datasets.length);
-            }
-        } catch (err: any) {
-            if (TRACE) console.warn('[API-TRACE] Kaggle EXCEPTION query=' + q + ' err=' + String(err?.message || err).slice(0,100));
+            const data = await res.json();
+            const items: any[] = Array.isArray(data) ? data : [];
+            searchResultCache.set(cacheKey, items);
+            rawResults.push(...items);
+            if (TRACE) console.log('[KAGGLE] q=', q, 'found=', items.length);
+        } catch {
+            if (TRACE) console.warn('[KAGGLE] parse error q=', q);
         }
     }
 
-    const unique = new Map<string, Partial<NormalizedDataset>>();
-    for (const d of results) { if (d.id && !unique.has(d.id)) unique.set(d.id, d); }
-    const finalDatasets = Array.from(unique.values());
+    // Deduplicate by ref
+    const uniqueMap = new Map<string, any>();
+    for (const item of rawResults) {
+        if (item?.ref && !uniqueMap.has(item.ref)) uniqueMap.set(item.ref, item);
+    }
+    const uniqueRaw = Array.from(uniqueMap.values());
+
+    // Relevance pre-filter
+    const allKeywords = [...qu.explicitKeywords, ...qu.inferredKeywords];
+    const filtered = uniqueRaw.filter(item => {
+        if (allKeywords.length === 0) return true;
+        const blob = [
+            item.title, item.subtitle, item.description,
+            ...(Array.isArray(item.tags) ? item.tags.map((t: any) => typeof t === 'string' ? t : t?.name ?? '') : [])
+        ].join(' ').toLowerCase();
+        return allKeywords.some(kw => blob.includes(kw.toLowerCase()));
+    });
+
+    if (TRACE) console.log('[KAGGLE] after dedup+filter:', filtered.length, '/', uniqueRaw.length);
+
+    // Normalize results
+    const normalized: Partial<NormalizedDataset>[] = filtered.map(item => {
+        const tags: string[] = (item.tags ?? []).map((t: any) => typeof t === 'string' ? t : t?.name ?? '').filter(Boolean);
+        const desc = item.subtitle || item.description || '';
+        const modality = inferKaggleModality(item.title ?? '', desc, tags);
+        const task = inferKaggleTask(item.title ?? '', desc, tags);
+        const sizeBytes: number | null = item.totalBytes ?? null;
+        const size = sizeBytes != null
+            ? sizeBytes > 1e9 ? `${(sizeBytes / 1e9).toFixed(1)} GB`
+            : sizeBytes > 1e6 ? `${(sizeBytes / 1e6).toFixed(0)} MB`
+            : sizeBytes > 1e3 ? `${(sizeBytes / 1e3).toFixed(0)} KB`
+            : `${sizeBytes} B`
+            : 'unknown';
+
+        const evidence = [
+            { value: item.title, state: 'CONFIRMED' as const, confidence: 1.0, source: 'Kaggle metadata', verified: true },
+            { value: item.licenseName || 'unknown', state: item.licenseName ? 'CONFIRMED' as const : 'UNKNOWN' as const, confidence: item.licenseName ? 0.9 : 0, source: 'Kaggle metadata', verified: !!item.licenseName },
+            { value: modality, state: modality !== 'unknown' ? 'INFERRED' as const : 'UNKNOWN' as const, confidence: modality !== 'unknown' ? 0.7 : 0, source: 'inferred from title/description/tags', verified: false },
+        ];
+
+        return {
+            id: item.ref,
+            name: item.title ?? item.ref,
+            title: item.title ?? item.ref,
+            subtitle: item.subtitle ?? '',
+            source: 'Kaggle' as const,
+            url: `https://www.kaggle.com/datasets/${item.ref}`,
+            description: desc.slice(0, 2000),
+            domain: qu.domain.value ?? '',
+            subdomain: qu.subdomain.value ?? '',
+            task,
+            modality,
+            modalities: modality !== 'unknown' ? [modality] : [],
+            formats: [],
+            languages: [],
+            license: item.licenseName ?? 'unknown',
+            size,
+            sizeBytes,
+            downloads: item.downloadCount ?? null,
+            likes: item.voteCount ?? null,
+            creator: item.creatorName ?? 'unknown',
+            tags,
+            schema: {},
+            splits: {},
+            features: [],
+            sample_count: null,
+            image_resolution: null,
+            video: modality === 'video',
+            related_models: [],
+            raw_metadata: item,
+            evidence,
+            targetLabels: [],
+            metadataQuality: computeKaggleMetadataQuality(item, desc, tags),
+            matchScore: 0,
+            scoreBreakdown: { task: 0, modality: 0, domain: 0, subdomain: 0, target: 0, metadata: 0, semantic: 0, quality: 0, popularity: 0 },
+            rejected: false,
+            rejectionReason: null,
+            matchReason: '',
+        };
+    });
+
     const dur = Math.round(performance.now() - t0);
-
     if (trace) {
-        const failed = overallStatus !== 200 && finalDatasets.length === 0;
-        trace.success = !failed;
-        if (failed) trace.status = overallStatus;
-        trace.datasetsFound = finalDatasets.length;
+        trace.success = normalized.length > 0 || httpStatus === 200;
+        trace.datasetsFound = normalized.length;
         trace.durationMs = dur;
+        if (httpStatus !== null && httpStatus !== 200) trace.httpStatus = httpStatus;
+        if (diagnostics.networkFailures > 0) trace.networkFailures = diagnostics.networkFailures;
+        if (httpStatus === null && diagnostics.networkFailures > 0) trace.reason = 'Network connection to Kaggle failed';
     }
+    if (TRACE) console.log('[KAGGLE] DONE total=', normalized.length, 'duration=', dur, 'ms');
 
-    if (finalDatasets.length > 0) {
-        if (TRACE) console.log('[API-TRACE] Kaggle SUCCESS total_unique=' + finalDatasets.length + ' duration=' + dur + 'ms');
-    } else {
-        if (TRACE) console.warn('[API-TRACE] Kaggle WARNING total_unique=0 duration=' + dur + 'ms status=' + overallStatus);
-    }
-    return finalDatasets;
+    return normalized;
+}
+
+function computeKaggleMetadataQuality(item: any, desc: string, tags: string[]): number {
+    let score = 0;
+    if (item.title) score += 20;
+    if (desc.length > 50) score += 20;
+    if (desc.length > 200) score += 10;
+    if (item.licenseName && item.licenseName !== 'Unknown') score += 20;
+    if (tags.length > 2) score += 10;
+    if (item.totalBytes != null) score += 10;
+    if (item.downloadCount > 100) score += 10;
+    return Math.min(100, score);
 }

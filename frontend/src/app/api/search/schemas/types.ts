@@ -1,26 +1,55 @@
 import type { ConfidenceBreakdown } from '../services/ranking/confidenceCalculator';
 
+export type FactState = 'CONFIRMED' | 'INFERRED' | 'UNKNOWN';
+
+export interface EvidenceFact<T> {
+    value: T;
+    state: FactState;
+    confidence: number;
+    source: string;
+    verified: boolean;
+    reasoning?: string;
+}
+
 export interface ProjectSpec {
-    problem_statement: string;
-    title: string;
+    intent: string;
+    entity_type: 'dataset' | 'model' | 'architecture' | 'unknown' | string;
     domain: string;
     subdomain: string;
-    data_modality: string;
-    input_type: string;
     task: string;
-    secondary_tasks: string[];
-    target_type: string;
-    target_labels: string[];
-    expected_output: string;
-    constraints: string[];
-    explicit_facts: string[];
-    inferred_facts: string[];
-    unknown_facts: string[];
-    ambiguity_notes: string[];
-    primary_architecture: string;
-    alternative_architectures: string[];
-    architecture_reasoning: string;
-    confidence: ConfidenceBreakdown;
+    target: string; // E.g., 'coronary arteries', 'brain tumor'
+    modality: string;
+    preferred_sources: string[];
+    constraints: Record<string, any>;
+    keywords: string[];
+
+    // Legacy mapping (to be phased out, but keeping for compatibility during transition)
+    problem_statement?: string;
+    title?: string;
+    data_modality?: string;
+    input_type?: string;
+    secondary_tasks?: string[];
+    target_type?: string;
+    target_labels?: string[];
+    expected_output?: string;
+    primary_architecture?: string;
+    alternative_architectures?: string[];
+    architecture_reasoning?: string;
+    explicit_facts?: string[];
+    inferred_facts?: string[];
+    unknown_facts?: string[];
+    ambiguity_notes?: string[];
+    evaluation_metrics?: any;
+    dataset_size_requirement?: string;
+    deployment_requirement?: string;
+    preferred_language?: string;
+    interpretability_requirement?: string;
+    privacy_sensitivity?: string;
+
+    confidence?: ConfidenceBreakdown;
+
+    // Explicit evidence wrapper if we want to store it per field
+    evidence?: Record<string, EvidenceFact<any>>;
 }
 
 export interface NormalizedDataset {
@@ -28,29 +57,47 @@ export interface NormalizedDataset {
     name: string;
     title?: string;
     subtitle?: string;
-    source: 'Kaggle' | 'Hugging Face';
+    source: 'Kaggle' | 'Hugging Face' | string;
     url: string;
     description: string;
     domain: string;
     subdomain: string;
-    modality: string;
-    tasks: string[];
-    targetLabels: string[];
-    sizeBytes: number | null;
+    task: string;
+    modality?: string; // Legacy UI uses this
+    modalities: string[];
+    formats: string[];
+    languages: string[];
     license: string;
-    creator: string;
+    size: string; // e.g. "5 GB" or "500MB" or sizeBytes number
+    sizeBytes: number | null;
     downloads: number | null;
+    likes: number | null;
+    creator: string;
     tags: string[];
-    files: string[];
+    schema: Record<string, any>;
+    splits: Record<string, any>;
+    features: string[];
+    sample_count: number | string | null;
+    image_resolution: string | null;
+    video: boolean;
+    related_models: string[]; // Related model IDs
+    raw_metadata: Record<string, unknown>;
+    evidence: EvidenceFact<any>[];
+    targetLabels?: string[]; // Legacy
+
+    // Scoring
     metadataQuality: number;
     matchScore: number;
     scoreBreakdown: {
+        semantic?: number;
         task: number;
         modality: number;
         domain: number;
-        subdomain: number;
+        subdomain?: number;
         target: number;
         metadata: number;
+        quality?: number;
+        popularity?: number;
     };
     rejected: boolean;
     rejectionReason: string | null;
@@ -60,25 +107,41 @@ export interface NormalizedDataset {
 export interface NormalizedModel {
     id: string;
     name: string;
-    source: 'Hugging Face';
+    source: 'Hugging Face' | string;
     url: string;
     task: string;
-    modality: string;
     architecture: string;
+    base_model: string;
+    parameters: string | number | null;
+    modality?: string;
+    modalities: string[];
+    languages: string[];
     framework: string;
-    parameters: number | null;
     license: string;
+    training_data: string[];
+    datasets_used: string[];
+    quantization: string | null;
+    context_length: number | null;
+    input_types: string[];
+    output_types: string[];
+    hardware_requirements?: any;
+    metrics: Record<string, any>;
+    evidence: EvidenceFact<any>[];
+    benchmarkEvidence?: string[]; // Legacy
+
     downloads: number | null;
     likes: number | null;
-    benchmarkEvidence: string[];
+
+    // Scoring
     matchScore: number;
     scoreBreakdown: {
         task: number;
         modality: number;
         architecture: number;
-        benchmark: number;
-        efficiency: number;
+        compatibility?: number; // Dataset <-> Model score
         popularity: number;
+        benchmark?: number; // Legacy
+        efficiency?: number; // Legacy
     };
     rejected: boolean;
     rejectionReason: string | null;
@@ -88,7 +151,6 @@ export interface NormalizedModel {
 export interface ProjectFeasibility {
     datasetAvailability: number;
     modelAvailability: number;
-    /** Higher = more computationally accessible (easier to train/run). */
     computationalFeasibility: number;
     documentation: number;
     datasetQuality: number;

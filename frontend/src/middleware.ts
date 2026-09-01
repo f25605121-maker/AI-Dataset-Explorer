@@ -31,9 +31,12 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Always allow NextAuth API routes, static files, and next internals
+  // Always allow NextAuth API routes, assistant API, static files, and next internals
   if (
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/assistant') ||
+    pathname.startsWith('/api/search') ||
+    pathname.startsWith('/api/health') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.includes('.')

@@ -1,142 +1,235 @@
-import { NormalizedModel, ProjectSpec } from '../../schemas/types';
-
 /**
- * Split a compound architecture string like "YOLOv8 + ByteTrack / RT-DETR"
- * into individual tokens for matching.
+ * Model Scorer — Compatibility-First Ranking
+ *
+ * Scores models based on task/modality/architecture compatibility with
+ * the query understanding. Rejects incompatible models BEFORE scoring.
  */
-function splitArchTokens(arch: string): string[] {
-    return arch
-        .toLowerCase()
-        .split(/[\s+\/,|]+/)
-        .map(t => t.trim())
-        .filter(t => t.length > 1);
+
+import type { NormalizedModel } from '../../schemas/types';
+import type { QueryUnderstanding } from '../queryUnderstanding/queryParser';
+
+export type ModelMatchCategory = 'BEST_COMPATIBLE' | 'STRONG_ALTERNATIVE' | 'EXPERIMENTAL' | 'RELATED_INCOMPATIBLE';
+
+export function getModelMatchCategory(score: number, rejected: boolean): ModelMatchCategory {
+    if (rejected) return 'RELATED_INCOMPATIBLE';
+    if (score >= 75) return 'BEST_COMPATIBLE';
+    if (score >= 50) return 'STRONG_ALTERNATIVE';
+    if (score >= 30) return 'EXPERIMENTAL';
+    return 'RELATED_INCOMPATIBLE';
 }
 
-export function scoreModel(model: Partial<NormalizedModel>, spec: ProjectSpec): NormalizedModel {
-    const mod = { ...model } as NormalizedModel;
-    mod.scoreBreakdown = { task: 0, modality: 0, architecture: 0, benchmark: 0, efficiency: 0, popularity: 0 };
-    mod.rejected = false;
-    mod.rejectionReason = null;
+// ── Hard rejection rules ──────────────────────────────────────────────────────
 
-    const taskText = Array.isArray(spec.task) ? spec.task.join(' ') : String(spec.task || '');
-    const primaryArchText = String(spec.primary_architecture || '');
-    const modalityText = String(spec.data_modality || '');
+function shouldRejectModel(model: Partial<NormalizedModel>, qu: QueryUnderstanding): string | null {
+    const modelText = `${model.id ?? ''} ${model.name ?? ''} ${model.task ?? ''} ${model.architecture ?? ''}`.toLowerCase();
+    const queryDomain = (qu.domain.value ?? '').toLowerCase();
+    const queryTask = (qu.task.value ?? '').toLowerCase();
+    const queryModality = (qu.modality.value ?? '').toLowerCase();
 
-    const modelText = `${mod.name ?? ''} ${mod.task ?? ''} ${mod.architecture ?? ''}`.toLowerCase();
-    const specTaskLower = taskText.toLowerCase();
-    const specModalityLower = modalityText.toLowerCase();
-
-    // Split compound architecture into individual tokens
-    const primaryArchTokens = splitArchTokens(primaryArchText);
-    const altArchTokens = (spec.alternative_architectures ?? []).flatMap(a => splitArchTokens(a));
-
-    // Hard reject: project is NLP/text but model is a vision-only model
-    const isTextProject = /(text|nlp|sentiment|document|language|review)/.test(specTaskLower);
-    const isVisionOnlyModel = /^(yolo|detr|efficientdet|faster.?rcnn|convnext|vit|resnet|unet)/.test(modelText);
-    if (isTextProject && isVisionOnlyModel) {
-        mod.rejected = true;
-        mod.rejectionReason = 'Vision-only architecture selected for a text/NLP task';
-        mod.matchScore = 0;
-        return mod;
+    // NLP/text project + vision-only model
+    const isTextQuery = /\btext\b|\bnlp\b|\bsentiment\b|\bdocument\b/.test(queryTask + ' ' + queryModality);
+    const isVisionOnlyModel = /^(?:yolo|detr|efficientdet|faster.?rcnn|convnext|vit[\s\-]|resnet[\s\d]|unet)/.test(modelText);
+    if (isTextQuery && isVisionOnlyModel) {
+        return 'Vision-only model incompatible with text/NLP task';
     }
 
-    // Name-based domain rejection for vision projects
-    // Rejects models whose name contains clearly irrelevant domain keywords
-    const modelNameLower = String(mod.name || mod.id || '').toLowerCase();
-    const isVisionProject = /(detect|track|segment|classif|count)/.test(specTaskLower) && !isTextProject;
-    if (isVisionProject) {
-        const irrelevant = [/table.?extract/, /anime/, /face.?(detect|recog|swap|generat)/, /stock.?market|trading|finance/, /sentiment|product.?review/, /speech|whisper/, /depth.?estim/, /generat|diffusion|stable.?diff|inpaint/];
-        const projectCtx = String(spec.domain||'').toLowerCase() + ' ' + String(spec.subdomain||'').toLowerCase() + ' ' + specTaskLower;
-        const needsFace = /(face|pedestrian|person|human)/.test(projectCtx);
-        if (!needsFace && irrelevant.some(re => re.test(modelNameLower))) {
-            mod.rejected = true;
-            mod.rejectionReason = 'Model name suggests unrelated domain: ' + modelNameLower.split('/').pop()?.slice(0, 40);
-            mod.matchScore = 0;
-            return mod;
+    // Vision/imaging project + irrelevant text/speech model
+    const isImagingQuery = /ct|mri|x.ray|image|segmentation|detection|visual/.test(queryTask + ' ' + queryModality);
+    const isTextModel = /\bwhisper\b|\bllama\b|\bgemma\b|\bmistral\b|\bgpt\b|\bbert\b|\bt5\b/.test(modelText);
+    const isTextTask = /text.generat|text.classif|translation|summariz|question.answer/.test(model.task ?? '');
+    if (isImagingQuery && isTextModel && isTextTask) {
+        return 'Text/language model incompatible with imaging task';
+    }
+
+    // Robotics query + text-only model
+    const isRoboticsQuery = /robot|manipulation|lerobot|so.101|teleoperat/.test(queryDomain + ' ' + queryTask);
+    const isTextOnlyModel = isTextModel && isTextTask;
+    if (isRoboticsQuery && isTextOnlyModel) {
+        return 'Text-only model incompatible with robotics task';
+    }
+
+    // Audio query + vision-only model
+    const isAudioQuery = /audio|speech|sound/.test(queryModality + ' ' + queryTask);
+    if (isAudioQuery && isVisionOnlyModel) {
+        return 'Vision-only model incompatible with audio task';
+    }
+
+    return null;
+}
+
+// ── Component scores ──────────────────────────────────────────────────────────
+
+function n(s?: string | null): string {
+    return (s ?? '').toLowerCase().trim();
+}
+
+function scoreModelTask(model: Partial<NormalizedModel>, qu: QueryUnderstanding): number {
+    const queryTask = n(qu.task.value);
+    if (!queryTask || queryTask === 'unknown') return 50;
+
+    const modelTask = n(model.task);
+    const modelText = `${n(model.id)} ${modelTask} ${n(model.architecture)}`;
+
+    // Exact or high overlap match
+    if (modelTask === queryTask) return 100;
+    if (modelTask.includes(queryTask) || queryTask.includes(modelTask)) return 85;
+
+    // Task family matches
+    const taskFamilies: [string[], string[]][] = [
+        [['segmentation', 'segment'], ['image-segmentation', 'semantic-segmentation', 'instance-segmentation']],
+        [['detection', 'object detection'], ['object-detection', 'detection']],
+        [['classification'], ['image-classification', 'text-classification', 'audio-classification', 'classification']],
+        [['imitation learning', 'robotic manipulation'], ['robotics', 'robot-learning']],
+        [['speech recognition', 'asr'], ['automatic-speech-recognition']],
+        [['generation'], ['text-generation', 'image-generation']],
+    ];
+
+    for (const [queryFam, modelFam] of taskFamilies) {
+        const queryMatches = queryFam.some(t => queryTask.includes(t));
+        const modelMatches = modelFam.some(t => modelTask.includes(t) || modelText.includes(t));
+        if (queryMatches && modelMatches) return 75;
+    }
+
+    // Partial keyword match
+    const taskWords = queryTask.split(/\s+/).filter(w => w.length > 3);
+    const matched = taskWords.filter(w => modelText.includes(w)).length;
+    if (taskWords.length > 0) return Math.round((matched / taskWords.length) * 60);
+
+    return 10;
+}
+
+function scoreModelModality(model: Partial<NormalizedModel>, qu: QueryUnderstanding): number {
+    const queryModality = n(qu.modality.value);
+    if (!queryModality || queryModality === 'unknown') return 50;
+
+    const modelModality = n(model.modality);
+    const modelModalities = (model.modalities ?? []).map(n);
+    const modelText = `${n(model.id)} ${n(model.task)} ${n(model.architecture)} ${modelModalities.join(' ')}`;
+
+    // Exact
+    if (modelModality === queryModality || modelModalities.includes(queryModality)) return 100;
+    // Includes
+    if (modelModality.includes(queryModality) || queryModality.includes(modelModality)) return 80;
+
+    // Medical imaging family
+    const medModalities = ['ct', 'mri', 'x-ray', 'medical', 'image', 'image-classification', 'image-segmentation'];
+    const queryIsMedical = medModalities.some(m => queryModality.includes(m));
+    const modelIsMedical = medModalities.some(m => modelModality.includes(m) || modelText.includes(m));
+    if (queryIsMedical && modelIsMedical) return 70;
+
+    // Hard cross-modal mismatch
+    const imagingMods = ['ct', 'mri', 'x-ray', 'image', 'video', 'medical'];
+    const nonImagingMods = ['tabular', 'text', 'audio', 'time-series'];
+    if (imagingMods.some(m => queryModality.includes(m)) && nonImagingMods.some(m => modelModality.includes(m))) return 0;
+
+    return 20;
+}
+
+function scoreModelArchitecture(model: Partial<NormalizedModel>, qu: QueryUnderstanding): number {
+    // Architecture scoring based on task compatibility (since we have real arch now)
+    const arch = n(model.architecture);
+    const queryTask = n(qu.task.value);
+    const queryDomain = n(qu.domain.value);
+
+    if (arch === 'unknown') return 30; // Neutral for unknown architectures
+
+    // Known architecture-task alignments
+    const archTaskAlignments: [RegExp, string[]][] = [
+        [/yolo|detr|faster.?rcnn|efficientdet|rtdetr/i, ['detection', 'object detection']],
+        [/unet|segformer|sam|mask.?rcnn|panoptic/i, ['segmentation', 'instance segmentation', 'semantic segmentation']],
+        [/resnet|efficientnet|convnext|vit|swin/i, ['classification', 'image classification']],
+        [/bert|roberta|xlm|deberta/i, ['classification', 'text classification', 'ner', 'sentiment']],
+        [/gpt|llama|mistral|gemma|t5/i, ['generation', 'text generation', 'question answering']],
+        [/wav2vec|hubert|wavlm|whisper/i, ['speech recognition', 'audio classification', 'asr']],
+        [/smolvla|pi0|lerobot/i, ['imitation learning', 'robotic manipulation', 'vision-language-action']],
+        [/diffusion|stable.?diff|ddpm/i, ['generation', 'image generation']],
+    ];
+
+    for (const [archPattern, tasks] of archTaskAlignments) {
+        if (archPattern.test(arch)) {
+            if (tasks.some(t => queryTask.includes(t) || t.includes(queryTask))) return 90;
+            // Architecture exists but for wrong task
+            return 20;
         }
     }
 
-    // Determine task intent categories
-    const isDetectionTask = /(object detection|defect detection|bounding box|detect)/.test(specTaskLower);
-    const isTrackingTask = /(tracking|mot|multi.?object)/.test(specTaskLower);
-    const isSegmentationTask = /(segment)/.test(specTaskLower);
-    const isClassificationTask = /(classification|classify)/.test(specTaskLower) && !isDetectionTask;
-    const isForecastingTask = /(forecast|time.?series|temporal)/.test(specTaskLower);
-    const isTabularTask = /(tabular|xgboost|lightgbm|regression)/.test(specTaskLower) || /(tabular|structured)/.test(specModalityLower);
-    const candidateTaskLower = String(mod.task || '').toLowerCase();
+    // Generic: arch present and somewhat relevant to domain
+    if (arch !== 'unknown' && queryDomain && arch.length > 3) return 50;
 
-    // TASK (30 pts)
-    if (modelText.includes(specTaskLower)) {
-        mod.scoreBreakdown.task = 30;
-    } else if (isDetectionTask || isTrackingTask) {
-        // object-detection models are valid for both detection and tracking tasks
-        mod.scoreBreakdown.task = /(object.?detection|detection|yolo|detr|faster.?rcnn|rcnn)/.test(candidateTaskLower) ? 30 : 10;
-    } else if (isSegmentationTask) {
-        mod.scoreBreakdown.task = /(segment|mask|unet|panoptic)/.test(candidateTaskLower) ? 30 : 10;
-    } else if (isClassificationTask && /(image|vision|mri|medical|radiology)/.test(specModalityLower)) {
-        mod.scoreBreakdown.task = /(image.?classification|classification|vision)/.test(candidateTaskLower) ? 30 : 10;
-    } else if (/(sentiment|review|text|document|nlp)/.test(specTaskLower)) {
-        mod.scoreBreakdown.task = /(sentiment|review|text|document|nlp|classification)/.test(candidateTaskLower) ? 30 : 10;
-    } else if (isForecastingTask) {
-        mod.scoreBreakdown.task = /(forecast|time.?series|temporal)/.test(candidateTaskLower) ? 30 : 10;
-    } else if (isTabularTask) {
-        mod.scoreBreakdown.task = /(tabular|regression|classification|xgboost|lightgbm)/.test(candidateTaskLower) ? 30 : 10;
-    } else {
-        mod.scoreBreakdown.task = 10;
+    return 35;
+}
+
+function scoreModelCompatibilityWithDatasets(
+    model: Partial<NormalizedModel>,
+    datasetIds: string[]
+): number {
+    if (datasetIds.length === 0) return 50;
+    const trainingData = (model.training_data ?? []).concat(model.datasets_used ?? []).map(n);
+    const matches = datasetIds.filter(id => trainingData.some(td => td.includes(n(id)) || n(id).includes(td)));
+    if (matches.length > 0) return 100; // Actually trained on one of our datasets
+    return 50;
+}
+
+function scoreModelPopularity(model: Partial<NormalizedModel>): number {
+    const downloads = model.downloads ?? 0;
+    if (downloads > 100000) return 100;
+    if (downloads > 10000) return 75;
+    if (downloads > 1000) return 50;
+    if (downloads > 100) return 30;
+    return 10;
+}
+
+// ── Main scoring function ─────────────────────────────────────────────────────
+
+export function scoreModel(
+    model: Partial<NormalizedModel>,
+    qu: QueryUnderstanding,
+    datasetIds: string[] = []
+): NormalizedModel {
+    const m = { ...model } as NormalizedModel;
+    m.scoreBreakdown = { task: 0, modality: 0, architecture: 0, compatibility: 0, benchmark: 0, efficiency: 0, popularity: 0 };
+    m.rejected = false;
+    m.rejectionReason = null;
+
+    // Hard rejection check
+    const rejectionReason = shouldRejectModel(model, qu);
+    if (rejectionReason) {
+        m.rejected = true;
+        m.rejectionReason = rejectionReason;
+        m.matchScore = 0;
+        return m;
     }
 
-    // MODALITY (20 pts)
-    const modModalityLower = String(mod.modality || '').toLowerCase();
-    if (modModalityLower === specModalityLower ||
-        (specModalityLower.includes(modModalityLower) && modModalityLower.length > 2)) {
-        mod.scoreBreakdown.modality = 20;
-    } else if (specModalityLower.includes('video') && modModalityLower.includes('image')) {
-        // video projects can use image-based models (frame-by-frame)
-        mod.scoreBreakdown.modality = 15;
-    } else {
-        mod.scoreBreakdown.modality = 10;
-    }
+    // Component scores
+    const taskScore = scoreModelTask(model, qu);
+    const modalityScore = scoreModelModality(model, qu);
+    const archScore = scoreModelArchitecture(model, qu);
+    const compatibilityScore = scoreModelCompatibilityWithDatasets(model, datasetIds);
+    const popularityScore = scoreModelPopularity(model);
 
-    // ARCHITECTURE (20 pts) — match any token from the compound primary arch
-    if (primaryArchTokens.some(tok => tok.length > 1 && modelText.includes(tok))) {
-        mod.scoreBreakdown.architecture = 20;
-    } else if (altArchTokens.some(tok => tok.length > 1 && modelText.includes(tok))) {
-        mod.scoreBreakdown.architecture = 15;
-    } else {
-        mod.scoreBreakdown.architecture = 5;
-    }
-
-    // BENCHMARK (15 pts)
-    mod.scoreBreakdown.benchmark = (mod.benchmarkEvidence && mod.benchmarkEvidence.length > 0) ? 15 : 5;
-
-    // EFFICIENCY (10 pts) — parameter count heuristic
-    if (mod.parameters) {
-        if (mod.parameters < 1_000_000_000) mod.scoreBreakdown.efficiency = 10;
-        else if (mod.parameters < 7_000_000_000) mod.scoreBreakdown.efficiency = 7;
-        else mod.scoreBreakdown.efficiency = 3;
-    } else {
-        mod.scoreBreakdown.efficiency = 5;
-    }
-
-    // POPULARITY (5 pts)
-    if (mod.downloads && mod.downloads > 100_000) mod.scoreBreakdown.popularity = 5;
-    else if (mod.downloads && mod.downloads > 1_000) mod.scoreBreakdown.popularity = 3;
-    else mod.scoreBreakdown.popularity = 1;
-
-    mod.matchScore = Math.min(100, Math.round(
-        mod.scoreBreakdown.task +
-        mod.scoreBreakdown.modality +
-        mod.scoreBreakdown.architecture +
-        mod.scoreBreakdown.benchmark +
-        mod.scoreBreakdown.efficiency +
-        mod.scoreBreakdown.popularity
+    // Weights: task 30, modality 20, architecture 20, compatibility 15, popularity 15
+    const finalScore = Math.min(100, Math.round(
+        taskScore       * 0.30 +
+        modalityScore   * 0.20 +
+        archScore       * 0.20 +
+        compatibilityScore * 0.15 +
+        popularityScore * 0.15
     ));
 
-    mod.matchReason = [
-        `Task: ${mod.scoreBreakdown.task}/30`,
-        `Arch: ${mod.scoreBreakdown.architecture}/20`,
-        `Modality: ${mod.scoreBreakdown.modality}/20`,
-    ].join(', ') + '.';
+    m.scoreBreakdown = {
+        task: Math.round(taskScore * 0.30),
+        modality: Math.round(modalityScore * 0.20),
+        architecture: Math.round(archScore * 0.20),
+        compatibility: Math.round(compatibilityScore * 0.15),
+        benchmark: 0,
+        efficiency: 0,
+        popularity: Math.round(popularityScore * 0.15),
+    };
+    m.matchScore = finalScore;
 
-    return mod;
+    const parts = [`Task: ${taskScore}%`, `Modality: ${modalityScore}%`, `Arch: ${archScore}%`];
+    if (compatibilityScore >= 80) parts.push('Trained on related dataset');
+    m.matchReason = parts.join(', ');
+
+    return m;
 }
