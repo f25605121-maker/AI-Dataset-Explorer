@@ -1,7 +1,12 @@
 import json
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import TypeDecorator, Text
 from backend.app.core.config import settings
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 try:
     if settings.USE_PGVECTOR:

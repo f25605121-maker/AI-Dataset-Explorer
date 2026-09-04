@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Integer, Float, DateTime, JSON
 from backend.app.db.session import Base
+from backend.app.models.types import utcnow
 
 
 class SearchLog(Base):
@@ -14,7 +14,7 @@ class SearchLog(Base):
     ranking_latency_ms = Column(Float, nullable=True)
     llm_latency_ms = Column(Float, nullable=True)
     final_recommendation_ids = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
 
 
 class Feedback(Base):
@@ -26,7 +26,7 @@ class Feedback(Base):
     action = Column(String(32), nullable=False)  # thumbs_up, thumbs_down, click, bookmark, open_pdf
     user_id = Column(String(64), nullable=True, index=True)
     comment = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
 
 
 class IngestionJob(Base):
@@ -37,5 +37,5 @@ class IngestionJob(Base):
     status = Column(String(32), default="PENDING")  # PENDING, RUNNING, COMPLETED, FAILED
     items_indexed = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    started_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)

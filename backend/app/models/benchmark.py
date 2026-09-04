@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, DateTime
 from backend.app.db.session import Base
+from backend.app.models.types import utcnow
 
 
 class Benchmark(Base):
@@ -18,4 +18,4 @@ class Benchmark(Base):
     hardware = Column(String(128), nullable=True)  # e.g., "1x RTX 3090", "A100-80GB"
     source = Column(String(128), nullable=True)  # e.g., "PapersWithCode", "Official Paper"
     source_url = Column(String(512), nullable=True)
-    reported_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reported_date = Column(DateTime, default=utcnow)

@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, DateTime, Text
 from backend.app.db.session import Base
+from backend.app.models.types import utcnow
 
 
 class PaperDataset(Base):
@@ -14,8 +14,8 @@ class PaperDataset(Base):
     confidence = Column(Float, default=1.0)
     evidence_source = Column(Text, nullable=True)
     source_url = Column(String(512), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class PaperModel(Base):
@@ -28,8 +28,8 @@ class PaperModel(Base):
     confidence = Column(Float, default=1.0)
     evidence_source = Column(Text, nullable=True)
     source_url = Column(String(512), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class DatasetModel(Base):
@@ -41,5 +41,5 @@ class DatasetModel(Base):
     compatibility_score = Column(Float, default=0.9)
     benchmark_score = Column(Float, nullable=True)
     evidence_source = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

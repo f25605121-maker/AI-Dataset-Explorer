@@ -1,8 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Integer, Float, DateTime, JSON
 from backend.app.db.session import Base
-from backend.app.models.types import VectorType
+from backend.app.models.types import VectorType, utcnow
 
 
 class Dataset(Base):
@@ -27,6 +26,6 @@ class Dataset(Base):
     label_information = Column(JSON, default=dict)
     quality_metadata = Column(JSON, default=dict)
     embedding = Column(VectorType, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    last_indexed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    last_indexed_at = Column(DateTime, default=utcnow)

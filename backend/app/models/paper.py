@@ -1,8 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Integer, DateTime, JSON
 from backend.app.db.session import Base
-from backend.app.models.types import VectorType
+from backend.app.models.types import VectorType, utcnow
 
 
 class Paper(Base):
@@ -31,5 +30,5 @@ class Paper(Base):
     source = Column(String(64), default="arxiv", index=True)
     source_id = Column(String(255), nullable=True, index=True)
     embedding = Column(VectorType, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
