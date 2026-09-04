@@ -23,7 +23,7 @@ class Dataset(Base):
     num_samples = Column(Integer, nullable=True)
     size_gb = Column(Float, nullable=True)
     languages = Column(JSON, default=list)
-    format = Column(JSON, default=list)
+    format = Column("format", JSON, default=list, quote=True)
     label_information = Column(JSON, default=dict)
     quality_metadata = Column(JSON, default=dict)
     embedding = Column(VectorType, nullable=True)
