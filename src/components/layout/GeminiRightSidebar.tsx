@@ -63,9 +63,6 @@ export function GeminiSidebar({
                                 <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0">
                                     ✦
                                 </div>
-                                <span className="font-bold text-sm text-white tracking-tight truncate">
-                                    Gemini Explorer
-                                </span>
                             </div>
 
                             {/* Collapse or Close button */}
@@ -336,7 +333,7 @@ export function GeminiSidebar({
         <>
             {/* Desktop Docked Sidebar (on LEFT side) */}
             <aside
-                aria-label="Gemini Recent Searches & Settings Sidebar"
+                aria-label="Recent Searches & Settings Sidebar"
                 className={`transition-all duration-300 ease-in-out border-r border-slate-800/80 bg-slate-950/95 backdrop-blur-xl hidden md:flex flex-col z-30 shrink-0 select-none ${
                     isCollapsed ? "w-16" : "w-[290px] sm:w-[310px]"
                 } ${className}`}
@@ -349,7 +346,7 @@ export function GeminiSidebar({
                 <div className="fixed inset-0 z-50 md:hidden flex justify-start">
                     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseMobile} />
                     <aside
-                        aria-label="Gemini Recent Searches & Settings Sidebar"
+                        aria-label="Recent Searches & Settings Sidebar"
                         className="relative w-[310px] max-w-[85vw] h-full bg-slate-950 border-r border-slate-800 shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200"
                     >
                         {renderContent(true)}
