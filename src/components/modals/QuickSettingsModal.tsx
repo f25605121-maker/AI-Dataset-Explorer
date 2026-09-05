@@ -28,9 +28,9 @@ export function QuickSettingsModal({ isOpen, onClose }: QuickSettingsModalProps)
 
     if (!isOpen) return null;
 
-    const userInitial = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "H";
-    const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "Hammad Tariq";
-    const userEmail = session?.user?.email || "hammadalitariq00@gmail.com";
+    const userInitial = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "G";
+    const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "Guest Explorer";
+    const userEmail = session?.user?.email || "Sign in to sync your preferences";
 
     const accents: { id: Accent; label: string; preview: string }[] = [
         { id: "violet-cyan", label: "Violet Cyan", preview: "from-violet-500 to-cyan-500" },

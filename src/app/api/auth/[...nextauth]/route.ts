@@ -7,6 +7,8 @@ import { isAccountLocked, recordFailedAttempt, resetFailedAttempts } from '@/ser
 import { logSecurityEvent } from '@/server/security/securityLogger';
 import { sanitizeEmail } from '@/server/security/sanitize';
 
+export const dynamic = 'force-dynamic';
+
 const useSecureCookies = Boolean(process.env.NEXTAUTH_URL?.startsWith('https://'));
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
@@ -155,6 +157,11 @@ const handler = NextAuth({
             return true;
         },
         async jwt({ token, user, account }) {
+            // Generate or preserve unique instance identifier for this device/session
+            if (!token.instanceId) {
+                token.instanceId = `inst_${Math.random().toString(36).substring(2, 10)}`;
+            }
+
             // Initial sign in
             if (user) {
                 // If it's an OAuth sign-in (e.g. Google), link to the persistent user in userStore
@@ -238,6 +245,7 @@ const handler = NextAuth({
             if (session && session.user) {
                 (session.user as any).id = token.id as string;
                 (session.user as any).role = (token.role as string) || 'USER';
+                (session.user as any).instanceId = token.instanceId as string;
                 if (token.name) session.user.name = token.name as string;
                 if (token.email) session.user.email = token.email as string;
             }

@@ -8,7 +8,11 @@ import { useState, Suspense } from "react";
 function LoginContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const callbackUrl = searchParams?.get("callbackUrl") || "/explore";
+    
+    // Support redirect_to or callbackUrl with strict Open Redirect defense
+    const rawTarget = searchParams?.get("redirect_to") || searchParams?.get("callbackUrl") || "/explore";
+    const isSafe = rawTarget.startsWith("/") && !rawTarget.startsWith("//") && !rawTarget.includes("\\");
+    const targetUrl = isSafe ? rawTarget : "/explore";
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +70,8 @@ function LoginContent() {
                                     };
                                     setError(errorMessages[errorCode] || errorMessages.Default);
                                 } else {
-                                    router.push(callbackUrl);
+                                    router.push(targetUrl);
+                                    router.refresh();
                                 }
                             } catch {
                                 setError("Unable to connect. Please check your internet connection and try again.");
@@ -148,7 +153,7 @@ function LoginContent() {
 
                     <div>
                         <button
-                            onClick={() => signIn("google", { callbackUrl })}
+                            onClick={() => signIn("google", { callbackUrl: targetUrl })}
                             className="w-full flex items-center justify-center gap-3 rounded-2xl border border-subtle bg-card-solid hover:bg-card-hover px-4 py-3 text-xs sm:text-sm font-bold text-primary transition shadow-sm"
                         >
                             <span className="text-base">G</span> Continue with Google

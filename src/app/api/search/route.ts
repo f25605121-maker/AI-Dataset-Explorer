@@ -32,6 +32,8 @@ function isRateLimited(ip: string): boolean {
     return false;
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
     try {
         const clientIp = extractIp(req);

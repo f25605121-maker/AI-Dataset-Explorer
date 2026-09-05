@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSession } from "next-auth/react";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
@@ -22,7 +23,7 @@ import { GeminiRightSidebar } from "@/components/layout/GeminiRightSidebar";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
 
 function ExploreContent() {
-    const { data: session } = useSession();
+    const { session } = useAuthGuard();
     const searchParams = useSearchParams();
     const initialQuery = searchParams?.get("q") || "";
     const { query: sessionQuery, searchResult: sessionResult, setSearchSession, pinnedAssets, clearPinnedAssets } = useSearchSession();

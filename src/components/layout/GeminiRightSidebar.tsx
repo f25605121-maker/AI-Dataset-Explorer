@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRecentSearches, RecentSearchItem } from "@/hooks/useRecentSearches";
 import { QuickSettingsModal } from "@/components/modals/QuickSettingsModal";
@@ -28,8 +29,8 @@ export function GeminiSidebar({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
-    const userInitial = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "H";
-    const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "Hammad Tariq";
+    const userInitial = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "G";
+    const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "Guest Explorer";
 
     const handleItemClick = (query: string, isMobile = false) => {
         if (isMobile && onCloseMobile) {
@@ -219,66 +220,112 @@ export function GeminiSidebar({
                 {/* ── Bottom Section: Profile & Settings ── */}
                 <div className="p-3 border-t border-slate-800/80 bg-slate-950/95 mt-auto shrink-0">
                     {!collapsed ? (
-                        <div
-                            onClick={() => setSettingsModalOpen(true)}
-                            className="flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-slate-900/80 cursor-pointer transition group"
-                            title="Open Profile & Settings"
-                        >
-                            {/* Profile Info */}
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30 group-hover:scale-105 transition-transform">
-                                    {userInitial}
+                        session?.user ? (
+                            <div
+                                onClick={() => setSettingsModalOpen(true)}
+                                className="flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-slate-900/80 cursor-pointer transition group"
+                                title="Open Profile & Settings"
+                            >
+                                {/* Profile Info */}
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30 group-hover:scale-105 transition-transform">
+                                        {userInitial}
+                                    </div>
+                                    <div className="min-w-0 flex flex-col justify-center">
+                                        <span className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                                            {userName}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="min-w-0 flex flex-col justify-center">
-                                    <span className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition-colors">
-                                        {userName}
-                                    </span>
-                                </div>
-                            </div>
 
-                            {/* Settings Gear Icon (⚙) at the far right */}
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSettingsModalOpen(true);
-                                }}
-                                className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 group-hover:text-white flex items-center justify-center transition shrink-0"
-                                title="Settings & Preferences"
-                                aria-label="Settings"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                    />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </button>
-                        </div>
+                                {/* Settings Gear Icon (⚙) at the far right */}
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSettingsModalOpen(true);
+                                    }}
+                                    className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 group-hover:text-white flex items-center justify-center transition shrink-0"
+                                    title="Settings & Preferences"
+                                    aria-label="Settings"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                                        />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between gap-2 p-1">
+                                <Link
+                                    href="/login?redirect_to=/explore"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-semibold transition shadow-sm"
+                                >
+                                    <span>Sign in to account</span>
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsModalOpen(true)}
+                                    className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition shrink-0"
+                                    title="Settings & Preferences"
+                                    aria-label="Settings"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                                        />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )
                     ) : (
-                        <div className="flex flex-col items-center space-y-2">
-                            {/* Collapsed user avatar */}
-                            <button
-                                type="button"
-                                onClick={() => setSettingsModalOpen(true)}
-                                className="w-8 h-8 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shadow-md shadow-purple-600/30 hover:scale-110 transition-transform"
-                                title={`${userName} - Click for Settings`}
-                            >
-                                {userInitial}
-                            </button>
-                            {/* Collapsed gear icon */}
-                            <button
-                                type="button"
-                                onClick={() => setSettingsModalOpen(true)}
-                                className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition"
-                                title="Settings & Preferences"
-                            >
-                                ⚙
-                            </button>
-                        </div>
+                        session?.user ? (
+                            <div className="flex flex-col items-center space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsModalOpen(true)}
+                                    className="w-8 h-8 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shadow-md shadow-purple-600/30 hover:scale-110 transition-transform"
+                                    title={`${userName} - Click for Settings`}
+                                >
+                                    {userInitial}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsModalOpen(true)}
+                                    className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition"
+                                    title="Settings & Preferences"
+                                >
+                                    ⚙
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center space-y-2">
+                                <Link
+                                    href="/login?redirect_to=/explore"
+                                    className="w-8 h-8 rounded-xl bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 flex items-center justify-center text-xs font-bold transition"
+                                    title="Sign In"
+                                >
+                                    🔑
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsModalOpen(true)}
+                                    className="w-8 h-8 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition"
+                                    title="Settings & Preferences"
+                                >
+                                    ⚙
+                                </button>
+                            </div>
+                        )
                     )}
                 </div>
             </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useTheme } from "@/context/ThemeContext";
@@ -101,7 +102,7 @@ function useLocalState<T>(key: string, initial: T): [T, React.Dispatch<React.Set
 
 // ── component ─────────────────────────────────────────────────────────────
 export default function SettingsPage() {
-    const { data: session } = useSession();
+    const { session } = useAuthGuard();
     const { toasts, show }  = useToast();
 
     const [activeTab, setActiveTab] = useState("Profile");

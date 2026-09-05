@@ -39,9 +39,6 @@ const PUBLIC_PATHS = [
     '/',
     '/login',
     '/signup',
-    '/explore',
-    '/roadmaps',
-    '/search',
     '/api/health',
     '/api/csrf',
     '/api/webhooks',
@@ -185,10 +182,48 @@ export async function middleware(req: NextRequest) {
     // 6. Require Authentication for Protected Routes
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
+        // If API route: return 401 Unauthorized instead of redirect
+        if (pathname.startsWith('/api/')) {
+            const apiRes = new NextResponse(
+                JSON.stringify({ error: 'Authentication required.' }),
+                { status: 401, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }
+            );
+            return applySecurityHeaders(apiRes);
+        }
+
+        // If unauthenticated: strip foreign instance params from copied URLs
         const loginUrl = new URL('/login', req.url);
-        loginUrl.searchParams.set('callbackUrl', req.url);
-        return NextResponse.redirect(loginUrl);
+        loginUrl.searchParams.set('redirect_to', '/explore');
+        loginUrl.searchParams.set('callbackUrl', '/explore');
+
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        // Force browser and reverse proxies to never cache the unauthenticated redirect
+        redirectResponse.headers.set('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate');
+        return applySecurityHeaders(redirectResponse);
     }
+
+    // 7. Device / Session Instance URL Binding
+    // Every logged-in device gets a unique instance ID in the URL.
+    // If a user copies this URL to another device, that device will be rejected and bound to its own instance.
+    const instanceId = (token as any).instanceId as string | undefined;
+    if (instanceId && pathname === '/explore') {
+        const currentInst = req.nextUrl.searchParams.get('inst');
+        if (!currentInst || currentInst !== instanceId) {
+            const boundUrl = new URL(req.url);
+            boundUrl.searchParams.set('inst', instanceId);
+            const redirectResponse = NextResponse.redirect(boundUrl);
+            redirectResponse.headers.set('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate');
+            return applySecurityHeaders(redirectResponse);
+        }
+    }
+
+    // Attach user context headers to downstream request
+    const requestHeaders = new Headers(req.headers);
+    if (token.id) requestHeaders.set('x-user-id', token.id as string);
+    if ((token as any).role) requestHeaders.set('x-user-role', (token as any).role as string);
+
+    // Ensure protected responses are private and not cached by shared proxies
+    response.headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
 
     return response;
 }

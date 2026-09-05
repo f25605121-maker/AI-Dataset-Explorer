@@ -11,6 +11,8 @@ import { extractIp } from '@/server/security/rate-limit';
  *   to avoid leaking the existence of administrative endpoints to scanners.
  * - Requires explicit role: 'SUPER_ADMIN'.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
     const ip = extractIp(req);
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
