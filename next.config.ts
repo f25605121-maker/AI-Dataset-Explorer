@@ -25,9 +25,9 @@ const nextConfig: NextConfig = {
                         value: [
                             "default-src 'self'",
                             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-                            "style-src 'self' 'unsafe-inline'",
+                            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                             "img-src 'self' data: https: blob:",
-                            "font-src 'self' data:",
+                            "font-src 'self' data: https://fonts.gstatic.com",
                             "connect-src 'self' https://openrouter.ai https://huggingface.co https://www.kaggle.com https://accounts.google.com https://generativelanguage.googleapis.com",
                             "frame-src https://accounts.google.com",
                             "form-action 'self'",
