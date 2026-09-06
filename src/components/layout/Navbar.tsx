@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/context/ThemeContext";
 import { useSearchSession } from "@/hooks/useSearchSession";
@@ -21,6 +21,20 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
   const { pinnedAssets } = useSearchSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [profileMenuOpen]);
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -38,7 +52,7 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
   ];
 
   return (
-    <header className={`sticky top-0 z-50 w-full border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md transition-colors duration-200 isolate ${className}`}>
+    <header className={`sticky top-0 z-50 w-full glass-nav transition-colors duration-200 isolate ${className}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
@@ -120,21 +134,100 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
             </button>
           )}
 
-          {/* If unauthenticated, show Sign In / Sign Up buttons */}
-          {!session?.user && (
+          {/* Auth Controls & Get Started Option */}
+          {!session?.user ? (
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover border border-transparent hover:border-subtle rounded-xl transition"
+                className="hidden sm:inline-flex px-3.5 py-1.5 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover border border-transparent hover:border-subtle rounded-xl transition"
               >
                 Sign In
               </Link>
               <Link
                 href="/signup"
-                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-accent text-white shadow-accent-sm hover:brightness-110 active:scale-95 transition"
+                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-accent text-white shadow-accent-sm hover:brightness-110 active:scale-95 transition flex items-center gap-1.5"
               >
-                Sign Up
+                <span>Get Started</span>
+                <span className="text-xs font-bold">→</span>
               </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/explore"
+                className="hidden sm:inline-flex px-4 py-1.5 text-xs font-bold rounded-xl bg-accent text-white shadow-accent-sm hover:brightness-110 active:scale-95 transition items-center gap-1.5"
+              >
+                <span>Get Started</span>
+                <span className="text-xs font-bold">→</span>
+              </Link>
+
+              {/* Profile Avatar & Dropdown */}
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 text-white font-bold text-xs flex items-center justify-center shadow-accent-sm hover:brightness-110 active:scale-95 transition border border-white/20"
+                  title={`Signed in as ${userName}`}
+                  aria-label="User profile"
+                  aria-expanded={profileMenuOpen}
+                >
+                  {userInitial.toUpperCase()}
+                </button>
+
+                {profileMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card border border-subtle shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-4 py-2.5 border-b border-subtle">
+                      <p className="text-xs font-bold text-primary truncate">{userName}</p>
+                      <p className="text-[11px] text-muted truncate">{userEmail}</p>
+                    </div>
+                    <div className="py-1">
+                      <Link
+                        href="/explore"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover transition"
+                      >
+                        <span>✦</span>
+                        <span>Explore Studio</span>
+                      </Link>
+                      <Link
+                        href="/benchmark"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover transition"
+                      >
+                        <span>⚖️</span>
+                        <span>Benchmark Lab</span>
+                      </Link>
+                      <Link
+                        href="/roadmap"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover transition"
+                      >
+                        <span>🛠️</span>
+                        <span>Pipeline Roadmap</span>
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-secondary hover:text-primary hover:bg-card-hover transition"
+                      >
+                        <span>⚙</span>
+                        <span>Settings & Preferences</span>
+                      </Link>
+                    </div>
+                    <div className="pt-1 border-t border-subtle">
+                      <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          signOut({ callbackUrl: "/" });
+                        }}
+                        className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition"
+                      >
+                        <span>🚪</span>
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -186,6 +279,42 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
               Settings & Preferences
             </Link>
           </nav>
+
+          {/* Mobile Auth / Get Started Options */}
+          <div className="pt-3 border-t border-subtle flex flex-col gap-2">
+            <Link
+              href={session?.user ? "/explore" : "/signup"}
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-center px-4 py-2.5 text-sm font-bold rounded-xl bg-accent text-white shadow-accent-sm hover:brightness-110 transition"
+            >
+              Get Started →
+            </Link>
+            {!session?.user ? (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center px-4 py-2 text-sm font-semibold text-secondary hover:text-primary hover:bg-card-hover rounded-xl border border-subtle transition"
+              >
+                Sign In
+              </Link>
+            ) : (
+              <div className="flex items-center justify-between px-2 pt-2">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-primary truncate">{userName}</span>
+                  <span className="text-[11px] text-muted truncate">{userEmail}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    signOut({ callbackUrl: "/" });
+                  }}
+                  className="px-3 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </header>
