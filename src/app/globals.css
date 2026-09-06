@@ -508,3 +508,36 @@ select:disabled {
   font-weight: 500;
 }
 
+/* Custom Horizon Scrollbar for horizontal flow sections */
+.custom-horizon-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  display: block;
+}
+.custom-horizon-scrollbar::-webkit-scrollbar-track {
+  background: #080D1A;
+  border-radius: 3px;
+}
+.custom-horizon-scrollbar::-webkit-scrollbar-thumb {
+  background: #1F293D;
+  border-radius: 3px;
+}
+.custom-horizon-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #22D3EE;
+}
+
+/* Accessibility: Focus visible ring styling */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #22D3EE;
+  outline-offset: 2px;
+}
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
