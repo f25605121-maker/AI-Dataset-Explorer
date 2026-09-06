@@ -2,649 +2,1365 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import QueryTerminal from "./QueryTerminal";
-import HardwareEstimator from "./HardwareEstimator";
+import { useRouter } from "next/navigation";
 
-// Dynamic import for Three.js WebGL canvas (client-only)
-const ThreeNeuralMesh = dynamic(() => import("./ThreeNeuralMesh"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full min-h-[380px] flex items-center justify-center bg-[#0e1629]/90 rounded-2xl">
-      <div className="flex flex-col items-center gap-3 text-cyan-300 font-label-code text-xs">
-        <div className="w-8 h-8 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
-        <span>Initializing 3D Neural Lattice...</span>
-      </div>
-    </div>
-  ),
-});
+interface DomainPreset {
+  query: string;
+  primaryTask: string;
+  primaryTaskSub: string;
+  modality: string;
+  modalitySub: string;
+  constraintFit: string;
+  constraintFitSub: string;
+  verification: string;
+  verificationSub: string;
+}
+
+const DOMAIN_PRESETS: Record<string, DomainPreset> = {
+  "3D Medical Imaging": {
+    query: "Detect tumors in 3D MRI scans with limited labeled data under 12GB VRAM and validate longitudinal progression metrics",
+    primaryTask: "Classification + Progress",
+    primaryTaskSub: "Dice & Progression Score",
+    modality: "3D MRI + Clinical EHR",
+    modalitySub: "T1w/T2-FLAIR + Tabular",
+    constraintFit: "≤ 12GB VRAM · Few-Shot",
+    constraintFitSub: "Ampere/Ada Architecture",
+    verification: "Topological Graph",
+    verificationSub: "Validated (94.2% Confs)",
+  },
+  "Multimodal Fusion": {
+    query: "Align clinical tabular EHR biomarkers with chest CT volume tensors using cross-attention under strict HIPAA compliance",
+    primaryTask: "Cross-Modal Alignment",
+    primaryTaskSub: "InfoNCE Loss + Contrastive",
+    modality: "Chest CT + Clinical EHR",
+    modalitySub: "3D Tensor + Tabular",
+    constraintFit: "≤ 16GB VRAM · Zero-Shot",
+    constraintFitSub: "Ada / Hopper Architecture",
+    verification: "Semantic Coherence",
+    verificationSub: "Validated (96.1% Confs)",
+  },
+  "Time-Series Forecasting": {
+    query: "Predict ICU patient telemetry shock events 6 hours in advance with irregular missing data under 8GB VRAM",
+    primaryTask: "Shock Event Prediction",
+    primaryTaskSub: "AUROC & Lead-Time Index",
+    modality: "ICU Telemetry Stream",
+    modalitySub: "Multivariate Continuous",
+    constraintFit: "≤ 8GB VRAM · Low Latency",
+    constraintFitSub: "Edge Tensor Architecture",
+    verification: "Temporal Coherence",
+    verificationSub: "Validated (95.4% Confs)",
+  },
+  "Sparse-Label NLP": {
+    query: "Few-shot clinical trial entity extraction from unstructured physician notes with fewer than 200 labeled examples",
+    primaryTask: "Entity Extraction (NER)",
+    primaryTaskSub: "Token-F1 & Exact Match",
+    modality: "Unstructured Notes",
+    modalitySub: "Clinical NLP & Transcripts",
+    constraintFit: "≤ 10GB VRAM · Few-Shot",
+    constraintFitSub: "PEFT / LoRA Adapter",
+    verification: "Lexical Precision",
+    verificationSub: "Validated (93.8% Confs)",
+  },
+  "Edge Robotics": {
+    query: "Real-time 6-DoF robotic arm grasp pose estimation using low-cost depth cameras on Jetson Orin Nano (8GB)",
+    primaryTask: "6-DoF Pose Estimation",
+    primaryTaskSub: "ADD-S & Latency Floor",
+    modality: "RGB-D Depth Stream",
+    modalitySub: "Point Cloud & Depth Frames",
+    constraintFit: "≤ 8GB VRAM · 60 FPS",
+    constraintFitSub: "Jetson Orin Nano / TensorRT",
+    verification: "Spatial Grounding",
+    verificationSub: "Validated (97.2% Confs)",
+  },
+};
+
+interface NodeData {
+  id: string;
+  name: string;
+  sub: string;
+  metric: string;
+  vram?: string;
+  description: string;
+}
+
+const NODES_DATA: Record<string, NodeData> = {
+  dataset: {
+    id: "dataset",
+    name: "ADNI-3 (845 Sub)",
+    sub: "Standardized 3D NIfTI cohort",
+    metric: "94% FIT",
+    description: "Multi-site longitudinal 3D MRI, PET, and CSF telemetry with validated consent protocols.",
+  },
+  model: {
+    id: "model",
+    name: "Swin UNETR 3D",
+    sub: "Shifted-Window Transformer",
+    metric: "9.4GB PEAK",
+    vram: "9.4 GB / 12.0 GB (78.3%)",
+    description: "Hierarchical 3D medical image segmentation backbone with shifted window self-attention.",
+  },
+  paper: {
+    id: "paper",
+    name: "CVPR '24 Fusion",
+    sub: "Multimodal Neuro Repr.",
+    metric: "342 CITES",
+    description: "Peer-reviewed methodology for fusing structural volumetric scans with clinical tabular markers.",
+  },
+  benchmark: {
+    id: "benchmark",
+    name: "BraTS / MedMNIST",
+    sub: "Standardized 3D Testbed",
+    metric: "0.884 DICE",
+    description: "Standardized volumetric benchmark validating high Dice accuracy across multi-scanner cohorts.",
+  },
+  pipeline: {
+    id: "pipeline",
+    name: "MONAI + Torch",
+    sub: "Native PyTorch 2.4",
+    metric: "OPTIMIZED",
+    description: "Production medical imaging preprocessing, affine transforms, and distributed training harnesses.",
+  },
+  execPlan: {
+    id: "execPlan",
+    name: "8 Step Spec",
+    sub: "ONNX / TRT Deployment",
+    metric: "1-CLICK RUN",
+    description: "From raw DICOM ingestion to quantized FP16 TensorRT inference runtime container.",
+  },
+  core: {
+    id: "core",
+    name: "3D MRI TUMOR PROBLEM",
+    sub: "Target: ≤ 12GB VRAM",
+    metric: "COHERENCE 94.2%",
+    vram: "9.4 GB Peak Estimated",
+    description: "Primary user problem statement decomposed into verified multi-modal topological constraints.",
+  },
+};
 
 export default function LandingPage() {
-  const [copiedCode, setCopiedCode] = useState(false);
+  const router = useRouter();
+  const [selectedDomain, setSelectedDomain] = useState<string>("3D Medical Imaging");
+  const [problemQuery, setProblemQuery] = useState<string>(
+    DOMAIN_PRESETS["3D Medical Imaging"].query
+  );
+  const [isRetrieving, setIsRetrieving] = useState<boolean>(false);
+  const [activeNodeKey, setActiveNodeKey] = useState<string>("model");
+  const [copiedScript, setCopiedScript] = useState<boolean>(false);
 
-  const handleCopySnippet = () => {
-    const code = `from peft import LoraConfig, get_peft_model
-# Auto-configured for 24GB VRAM target
-peft_config = LoraConfig(
-  r=16, lora_alpha=32,
-  target_modules=["q_proj", "v_proj"],
-  lora_dropout=0.05,
-  bias="none",
-  task_type="CAUSAL_LM"
-)`;
+  const activePreset = DOMAIN_PRESETS[selectedDomain] || DOMAIN_PRESETS["3D Medical Imaging"];
+  const activeNode = NODES_DATA[activeNodeKey] || NODES_DATA.model;
+
+  const handleDomainSelect = (domain: string) => {
+    setSelectedDomain(domain);
+    const preset = DOMAIN_PRESETS[domain];
+    if (preset) {
+      setProblemQuery(preset.query);
+    }
+  };
+
+  const handleSynthesize = () => {
+    setIsRetrieving(true);
+    setTimeout(() => {
+      setIsRetrieving(false);
+      router.push(`/explore?q=${encodeURIComponent(problemQuery)}`);
+    }, 600);
+  };
+
+  const handleCopyPipeline = () => {
+    const code = `# AI Dataset Explorer - Auto-Synthesized MONAI Pipeline
+import torch
+from monai.networks.nets import SwinUNETR
+from monai.transforms import Compose, LoadImaged, Spacingd, ScaleIntensityd
+
+# Verified hardware ceiling: <= 12GB VRAM
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = SwinUNETR(
+    img_size=(96, 96, 96),
+    in_channels=1,
+    out_channels=3,
+    feature_size=48,
+    use_checkpoint=True, # Saves ~3.2GB VRAM
+).to(device)
+
+print("Pipeline initialized successfully. Ready for ADNI-3 dataset.")`;
     navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 2200);
   };
 
   return (
-    <div className="bg-[#0d1322] text-[#F8FAFC] font-body-md text-[15px] antialiased min-h-screen flex flex-col selection:bg-cyan-400/30 selection:text-cyan-300 matrix-grid relative overflow-x-hidden">
-      {/* Ambient Glow Canvas Spotlights */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[1100px] h-[650px] bg-gradient-to-b from-cyan-500/25 via-blue-600/20 to-transparent rounded-full blur-[130px]" />
-        <div className="absolute top-[28%] -left-32 w-[650px] h-[650px] bg-violet-600/20 rounded-full blur-[140px]" />
-        <div className="absolute top-[50%] -right-32 w-[700px] h-[700px] bg-cyan-400/20 rounded-full blur-[150px]" />
-        <div className="absolute bottom-10 left-1/4 w-[850px] h-[450px] bg-indigo-500/20 rounded-full blur-[160px]" />
-      </div>
-
+    <div className="bg-surface-container-lowest text-on-surface font-body-md text-body-md antialiased min-h-screen flex flex-col selection:bg-cyan-radiant/25 selection:text-cyan-radiant">
       {/* ============================================================ */}
-      {/* HIGH-TECH GLASSMORPHIC & CYBER-COMPUTE NAVIGATION            */}
+      {/* 0. FIXED TOP HUD NAVIGATION BAR                              */}
       {/* ============================================================ */}
-      <header className="fixed top-3 inset-x-0 z-50 px-4 md:px-8 max-w-7xl mx-auto">
-        <div className="glass-card specular-border rounded-2xl px-4 py-2.5 flex items-center justify-between shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-cyan-500/30">
-          {/* Brand Logo + Name */}
-          <div className="flex items-center gap-3 shrink-0">
-            <Link className="flex items-center gap-2.5 group" href="/">
-              <div className="relative w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center p-0.5 group-hover:scale-105 transition-transform bg-[#0d1322] border border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.4)]">
+      <header className="fixed top-0 left-0 w-full z-50 bg-void-surface/90 backdrop-blur-xl border-b border-border-dim shadow-[0_1px_8px_rgba(0,0,0,0.4)]">
+        <div className="h-20 w-full px-grid-margin-desktop flex items-center justify-between gap-space-lg">
+          {/* Logo & Brand Identity */}
+          <div className="flex items-center gap-space-md">
+            <Link className="flex items-center gap-space-sm group" href="/">
+              <div className="relative h-9 w-9 rounded overflow-hidden flex items-center justify-center p-0.5 bg-void-base border border-border-dim group-hover:border-primary transition-all">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  alt="AI Dataset Explorer Logo"
-                  className="w-full h-full object-contain"
+                  alt="AI Dataset Explorer"
+                  className="h-full w-auto object-contain"
                   src="/logo-stitch.png"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-headline-sm text-[16px] font-bold tracking-tight text-white group-hover:text-cyan-300 transition-colors">
-                  AI Dataset <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-300 to-indigo-300">Explorer</span>
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-400/60 text-cyan-300 font-label-code text-[11px] font-bold shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-                  RAG 2.5
+              <div className="flex flex-col">
+                <div className="flex items-center gap-space-sm">
+                  <span className="font-headline-sm text-headline-sm text-text-primary font-bold tracking-tight group-hover:text-primary transition-colors">
+                    AI Dataset Explorer
+                  </span>
+                  <span className="hidden xl:inline-flex items-center gap-space-xs px-space-xs py-space-2xs rounded bg-void-elevated border border-border-dim font-label-mono-sm text-label-mono-sm text-primary uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-radiant animate-pulse" />
+                    ENGINE ONLINE · v2.4 HYBRID RETRIEVAL
+                  </span>
+                </div>
+                <span className="font-body-sm text-body-sm text-text-muted hidden sm:block">
+                  Discovery · Benchmarks · Roadmaps
                 </span>
               </div>
             </Link>
           </div>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1 font-body-sm text-[14px]">
+          <nav className="hidden lg:flex items-center gap-space-lg h-full">
             <Link
-              className="px-3.5 py-1.5 rounded-lg text-white bg-cyan-500/20 border border-cyan-400/40 font-semibold transition-all shadow-[0_0_14px_rgba(6,182,212,0.25)]"
+              aria-current="page"
+              className="h-full flex items-center font-body-md transition-colors px-space-2xs text-primary border-b-2 border-primary font-semibold"
               href="/"
             >
               Home
             </Link>
             <Link
-              className="px-3.5 py-1.5 rounded-lg text-slate-200 hover:text-cyan-300 hover:bg-white/10 transition-colors font-medium"
+              className="h-full flex items-center font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors px-space-2xs"
               href="/explore"
             >
               Explore Studio
             </Link>
             <Link
-              className="px-3.5 py-1.5 rounded-lg text-slate-200 hover:text-cyan-300 hover:bg-white/10 transition-colors font-medium"
+              className="h-full flex items-center font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors px-space-2xs"
               href="/benchmark"
             >
               Benchmark &amp; Compare Lab
             </Link>
             <Link
-              className="px-3.5 py-1.5 rounded-lg text-slate-200 hover:text-cyan-300 hover:bg-white/10 transition-colors font-medium"
+              className="h-full flex items-center font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:text-primary transition-colors px-space-2xs"
               href="/roadmap"
             >
-              Pipeline Roadmap
-            </Link>
-            <Link
-              className="px-3.5 py-1.5 rounded-lg text-slate-200 hover:text-cyan-300 hover:bg-white/10 transition-colors font-medium"
-              href="https://github.com/f25605121-maker/AI-Dataset-Explorer"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Docs
+              Pipeline &amp; Implementation Roadmap
             </Link>
           </nav>
 
-          {/* Right Telemetry & Actions */}
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Live Status Pill */}
-            <div className="hidden xl:flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/90 border border-cyan-500/30 text-[12px] font-label-code shadow-[0_0_12px_rgba(16,185,129,0.15)]">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-80" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-              </span>
-              <span className="text-slate-300">Ecosystem:</span>
-              <span className="text-emerald-300 font-bold">142k+ Online</span>
-              <span className="text-slate-500">|</span>
-              <span className="text-cyan-300 font-semibold">18ms p99</span>
+          {/* Action Hub */}
+          <div className="flex items-center gap-space-md">
+            {/* Live Latency Telemetry */}
+            <div className="hidden md:flex items-center gap-space-xs px-space-sm py-space-xs rounded bg-void-base border border-border-dim font-label-mono text-label-mono text-text-muted shadow-inner">
+              <span className="w-2 h-2 rounded-full bg-tertiary" />
+              <span className="text-tertiary font-bold">42ms</span>
+              <span className="opacity-70">API</span>
             </div>
 
-            {/* ⌘K Quick Switcher Button */}
+            {/* Dark Mode Icon Button */}
             <button
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-cyan-500/30 text-slate-200 hover:text-white hover:border-cyan-400 text-[12px] font-label-code transition-all shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-              onClick={() => {
-                const el = document.getElementById("aiTerminalInput");
-                el?.focus();
-                el?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              aria-label="Toggle Mode"
+              className="p-space-xs rounded bg-void-elevated border border-border-dim text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
               type="button"
             >
-              <span className="material-symbols-outlined text-[16px] text-cyan-300">terminal</span>
-              <span className="font-medium">Find weights</span>
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-200 border border-slate-700 text-[10px] font-semibold">⌘K</kbd>
+              <span className="material-symbols-outlined text-[18px]">dark_mode</span>
             </button>
 
-            {/* Launch Studio Radiant CTA */}
+            {/* Sign In Link */}
             <Link
-              className="relative group overflow-hidden rounded-xl p-[1px] font-headline-sm text-[13px] font-semibold"
+              className="hidden sm:inline-block font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+              href="/login"
+            >
+              Sign In
+            </Link>
+
+            {/* Radiant Launch Studio CTA */}
+            <Link
+              className="relative inline-flex items-center justify-center p-[1px] rounded overflow-hidden group shadow-md"
               href="/explore"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-indigo-500 to-violet-500 rounded-xl animate-pulse" />
-              <span className="relative block px-4 py-1.5 rounded-xl bg-[#0e1628] text-white group-hover:bg-opacity-80 transition-all flex items-center gap-1.5 shadow-[0_0_24px_rgba(6,182,212,0.5)]">
-                <span className="material-symbols-outlined text-[17px] text-cyan-300">rocket_launch</span>
-                <span className="font-bold">Launch Studio</span>
+              <span className="absolute inset-0 bg-gradient-to-r from-cyan-radiant via-primary to-purple-bright opacity-80 group-hover:opacity-100 transition-opacity" />
+              <span className="relative px-space-md py-space-xs rounded-[calc(0.125rem-1px)] bg-void-base text-primary font-headline-sm text-[13px] font-bold tracking-wide uppercase transition-colors group-hover:bg-void-surface flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">bolt</span>
+                Launch Studio
               </span>
+            </Link>
+
+            {/* User Profile Avatar */}
+            <Link
+              aria-label="User Account"
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity"
+              href="/settings"
+            >
+              <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
             </Link>
           </div>
         </div>
       </header>
 
       {/* ============================================================ */}
-      {/* MAIN HERO & WORKSPACE CONTENT                                */}
+      {/* MAIN CONTENT WRAPPER                                         */}
       {/* ============================================================ */}
-      <main className="relative z-10 flex-1 pt-28 pb-16">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col gap-24">
-          {/* HERO SECTION WITH INTEGRATED 3D NEURAL CORE */}
-          <section className="relative pt-6 md:pt-10 flex flex-col items-center">
-            {/* Glowing Nexus Badge */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-400/50 shadow-[0_0_28px_rgba(6,182,212,0.35)] mb-6 backdrop-blur-md">
-              <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="font-label-code text-[12px] uppercase tracking-wider text-cyan-300 font-bold">
-                ✦ RAG-Powered AI Intelligence 2.5 • Nexus Pipeline
-              </span>
-              <span className="text-cyan-500">•</span>
-              <span className="font-label-code text-[12px] text-indigo-200 font-semibold">
-                142k+ Models &amp; Sets
-              </span>
-            </div>
+      <main className="w-full pt-20 bg-surface-container-lowest flex-1">
+        <div className="flex flex-col w-full">
+          {/* Ambient Optical Emitters */}
+          <div className="relative w-full overflow-hidden">
+            <div className="absolute -top-32 left-1/4 w-[600px] h-[350px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
+            <div className="absolute top-20 right-10 w-[500px] h-[400px] bg-purple-bright/10 rounded-full blur-[160px] pointer-events-none" />
 
-            {/* Master Title */}
-            <h1 className="font-headline-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white max-w-5xl leading-[1.12] text-center">
-              Find the Perfect Dataset &amp; Weights for your{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-teal-200 to-indigo-300 drop-shadow-[0_0_35px_rgba(34,211,238,0.55)]">
-                Next AI Project
-              </span>
-            </h1>
-
-            {/* Subtitle */}
-            <p className="font-body-lead text-slate-200 text-lg md:text-xl max-w-3xl mt-5 font-normal leading-relaxed text-center">
-              High-dimensional vector search across Hugging Face, Kaggle &amp; arXiv. Synthesize instant VRAM feasibility profiles, quant compatibility matrices, and 5-phase execution roadmaps.
-            </p>
-
-            {/* Fast Feature Checklist Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-6 text-[13px] font-label-code text-slate-100">
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-emerald-500/40 shadow-[0_0_14px_rgba(16,185,129,0.2)]">
-                <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
-                <span className="font-medium">Hugging Face &amp; Kaggle Hybrid Pairing</span>
-              </div>
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 shadow-[0_0_14px_rgba(6,182,212,0.2)]">
-                <span className="material-symbols-outlined text-cyan-300 text-[18px]">memory</span>
-                <span className="font-medium">Accurate LoRA &amp; KV-Cache VRAM Math</span>
-              </div>
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-indigo-500/40 shadow-[0_0_14px_rgba(99,102,241,0.2)]">
-                <span className="material-symbols-outlined text-indigo-300 text-[18px]">schema</span>
-                <span className="font-medium">Production PyTorch &amp; vLLM Starters</span>
-              </div>
-            </div>
-
-            {/* HERO 3D NEURAL SCENE & QUERY PLAYGROUND SPLIT */}
-            <div className="w-full max-w-6xl mt-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Interactive 3D Scene Viewport Element */}
-              <div className="lg:col-span-5 flex flex-col items-center justify-center">
-                <div className="w-full glass-card specular-border rounded-2xl border border-cyan-500/35 overflow-hidden relative shadow-[0_0_40px_rgba(6,182,212,0.25)] flex flex-col">
-                  {/* 3D Viewport Header */}
-                  <div className="bg-[#0f172a]/95 px-4 py-2.5 border-b border-cyan-500/20 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                      <span className="font-label-code text-[11px] font-bold uppercase tracking-wider text-cyan-300">
-                        Live 3D Neural Mesh
-                      </span>
-                    </div>
-                    <span className="font-label-code text-[10px] text-indigo-300 px-2 py-0.5 rounded bg-indigo-950/70 border border-indigo-500/40">
-                      Interactive Orbit
+            {/* ============================================================ */}
+            {/* 1. HERO SECTION (2-Column Grid Desktop Wide)                 */}
+            {/* ============================================================ */}
+            <section className="w-full px-grid-margin-desktop pt-space-xl pb-space-3xl relative z-10">
+              <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-space-xl items-start">
+                {/* Left Column: Copy, Glass Input, Decomposition */}
+                <div className="xl:col-span-6 flex flex-col gap-space-lg">
+                  {/* Status Pill */}
+                  <div className="inline-flex items-center gap-space-sm self-start px-space-sm py-space-xs rounded bg-surface-container-high shadow-sm border border-border-dim">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-radiant opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                    </span>
+                    <span className="font-label-mono-sm text-label-mono-sm text-text-primary tracking-wider uppercase">
+                      AI RESEARCH OPERATING SYSTEM · v2.4 HYBRID RETRIEVAL
+                    </span>
+                    <span className="text-text-muted font-label-mono-sm text-label-mono-sm">/</span>
+                    <span className="font-label-mono-sm text-label-mono-sm text-tertiary">
+                      15,200+ BENCHMARKED ARTIFACTS
                     </span>
                   </div>
 
-                  {/* Embed 3D Animation Custom Element */}
-                  <div className="relative w-full h-[380px] bg-gradient-to-b from-[#0e1629]/90 to-[#0c1222]/95 flex items-center justify-center overflow-hidden">
-                    <ThreeNeuralMesh />
+                  {/* Hero Headline */}
+                  <div className="flex flex-col gap-space-xs">
+                    <h1 className="font-headline-xl text-headline-xl text-text-primary uppercase tracking-tight">
+                      TURN AI PROBLEMS INTO{" "}
+                      <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-bright via-cyan-radiant to-tertiary">
+                        RESEARCH-READY
+                      </span>{" "}
+                      SOLUTIONS.
+                    </h1>
+                    <p className="font-body-lg text-body-lg text-text-muted max-w-2xl">
+                      Describe your problem in plain language. AI Dataset Explorer extracts tasks, constraints, modality, and compute limits — then synthesizes verified datasets, pretrained backbones, research papers, and reproducible code.
+                    </p>
+                  </div>
 
-                    {/* Floating Interactive Hint */}
-                    <div className="absolute bottom-3 inset-x-3 flex items-center justify-between pointer-events-none text-[11px] font-label-code text-slate-300 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-cyan-500/30">
-                      <span className="flex items-center gap-1.5 text-cyan-300 font-semibold">
-                        <span className="material-symbols-outlined text-[14px]">view_in_ar</span> 42 Clustered Datasets
+                  {/* Glassmorphism Problem Input Box */}
+                  <div className="bg-surface-container/80 backdrop-blur-md rounded-xl p-space-md shadow-xl border border-border-dim flex flex-col gap-space-md">
+                    <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-text-muted">
+                      <span className="flex items-center gap-space-xs text-primary font-bold">
+                        <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                        <span>NEURAL PROMPT SYNTHESIZER</span>
                       </span>
-                      <span className="text-slate-300 text-[10px]">Move mouse to rotate</span>
+                      <span className="text-text-muted">PARSER: TENSOR-LLM-4</span>
+                    </div>
+
+                    <div className="relative">
+                      <textarea
+                        className="w-full bg-void-surface text-text-primary font-code-md text-code-md p-space-md rounded outline-none border border-border-dim focus:border-primary shadow-inner placeholder:text-text-muted/60 resize-none transition-colors"
+                        id="problemQueryInput"
+                        onChange={(e) => setProblemQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSynthesize();
+                          }
+                        }}
+                        placeholder="Detect tumors in 3D MRI scans with limited labeled data under 12GB VRAM..."
+                        rows={3}
+                        value={problemQuery}
+                      />
+                      <div className="absolute bottom-3 right-3 flex items-center gap-space-sm">
+                        <button
+                          className="flex items-center gap-space-xs px-space-md py-space-xs rounded bg-primary hover:bg-cyan-radiant text-on-primary font-headline-sm text-[13px] font-bold uppercase transition-all shadow-md active:scale-95 disabled:opacity-75"
+                          disabled={isRetrieving}
+                          id="synthesizeBtn"
+                          onClick={handleSynthesize}
+                          type="button"
+                        >
+                          {isRetrieving ? (
+                            <>
+                              <span className="material-symbols-outlined text-[16px] animate-spin">
+                                progress_activity
+                              </span>
+                              <span>Synthesizing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-[16px]">bolt</span>
+                              <span>Explore Corpus →</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Domain Prompt Chips */}
+                    <div className="flex flex-wrap items-center gap-space-xs pt-space-2xs">
+                      <span className="font-label-mono-sm text-label-mono-sm text-text-muted mr-space-xs">
+                        QUICK DOMAINS:
+                      </span>
+                      {Object.keys(DOMAIN_PRESETS).map((domain) => {
+                        const isSelected = selectedDomain === domain;
+                        return (
+                          <button
+                            className={`px-space-sm py-space-2xs rounded font-label-mono-sm text-label-mono-sm transition-all ${
+                              isSelected
+                                ? "bg-primary/20 text-primary border border-primary/50 shadow-sm"
+                                : "bg-void-elevated hover:bg-surface-bright text-on-surface-variant hover:text-text-primary border border-transparent"
+                            }`}
+                            key={domain}
+                            onClick={() => handleDomainSelect(domain)}
+                            type="button"
+                          >
+                            {domain}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Real-Time AI Problem Decomposition Panel */}
+                  <div className="bg-surface-container-low rounded-lg p-space-md shadow-md border border-border-dim">
+                    <div className="flex items-center justify-between pb-space-sm mb-space-sm border-b border-border-dim/60">
+                      <div className="flex items-center gap-space-xs font-label-mono text-label-mono text-text-primary">
+                        <span className="w-2 h-2 rounded-full bg-cyan-radiant" />
+                        <span>UNDERSTANDING YOUR PROBLEM</span>
+                        <span className="text-tertiary">(PARSER LATENCY 42ms)</span>
+                      </div>
+                      <span className="font-label-mono-sm text-label-mono-sm text-secondary bg-secondary-container/40 px-space-xs py-space-2xs rounded">
+                        ENTROPY: 0.12
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
+                      <div className="bg-void-surface p-space-sm rounded border border-border-dim/50">
+                        <span className="font-label-mono-sm text-label-mono-sm text-text-muted block">
+                          PRIMARY TASK
+                        </span>
+                        <span className="font-headline-sm text-[14px] text-primary font-bold mt-space-2xs block truncate">
+                          {activePreset.primaryTask}
+                        </span>
+                        <span className="font-label-mono-sm text-[9px] text-text-muted mt-space-2xs block">
+                          {activePreset.primaryTaskSub}
+                        </span>
+                      </div>
+                      <div className="bg-void-surface p-space-sm rounded border border-border-dim/50">
+                        <span className="font-label-mono-sm text-label-mono-sm text-text-muted block">
+                          MODALITY
+                        </span>
+                        <span className="font-headline-sm text-[14px] text-secondary font-bold mt-space-2xs block truncate">
+                          {activePreset.modality}
+                        </span>
+                        <span className="font-label-mono-sm text-[9px] text-text-muted mt-space-2xs block">
+                          {activePreset.modalitySub}
+                        </span>
+                      </div>
+                      <div className="bg-void-surface p-space-sm rounded border border-border-dim/50">
+                        <span className="font-label-mono-sm text-label-mono-sm text-text-muted block">
+                          CONSTRAINT FIT
+                        </span>
+                        <span className="font-headline-sm text-[14px] text-tertiary font-bold mt-space-2xs block truncate">
+                          {activePreset.constraintFit}
+                        </span>
+                        <span className="font-label-mono-sm text-[9px] text-text-muted mt-space-2xs block">
+                          {activePreset.constraintFitSub}
+                        </span>
+                      </div>
+                      <div className="bg-void-surface p-space-sm rounded border border-border-dim/50">
+                        <span className="font-label-mono-sm text-label-mono-sm text-text-muted block">
+                          VERIFICATION
+                        </span>
+                        <span className="font-headline-sm text-[14px] text-text-primary font-bold mt-space-2xs block truncate">
+                          {activePreset.verification}
+                        </span>
+                        <span className="font-label-mono-sm text-[9px] text-tertiary mt-space-2xs block">
+                          {activePreset.verificationSub}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Interactive 3D Topological Graph Inspector */}
+                <div className="xl:col-span-6 flex flex-col gap-space-md">
+                  <div className="relative w-full h-[580px] bg-void-surface rounded-xl overflow-hidden shadow-2xl border border-border-dim flex flex-col justify-between p-space-md">
+                    {/* Top HUD Bar */}
+                    <div className="flex items-center justify-between z-20 font-label-mono-sm text-label-mono-sm text-text-muted bg-void-surface/80 backdrop-blur-md px-space-sm py-space-xs rounded border border-border-dim/60">
+                      <div className="flex items-center gap-space-sm">
+                        <span className="text-primary font-bold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-cyan-radiant animate-pulse" />
+                          TOPOLOGICAL GRAPH INSPECTOR
+                        </span>
+                        <span className="px-space-xs py-space-2xs rounded bg-surface-container font-label-mono-sm text-text-primary">
+                          EGO-CENTRIC VIEW
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-space-md">
+                        <span className="flex items-center gap-space-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-tertiary" /> 9 NODES
+                        </span>
+                        <span className="flex items-center gap-space-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-bright" /> 14 EDGES
+                        </span>
+                        <span className="text-cyan-radiant font-bold">94.2% COHERENCE</span>
+                      </div>
+                    </div>
+
+                    {/* Center Interactive Network SVG Visualization */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+                      <svg className="w-full h-full" id="universeSvg" viewBox="0 0 700 520">
+                        <defs>
+                          <radialGradient cx="50%" cy="50%" id="centerGlow" r="50%">
+                            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
+                            <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+                          </radialGradient>
+                          <radialGradient cx="50%" cy="50%" id="purpleGlow" r="50%">
+                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                          </radialGradient>
+                          <linearGradient id="edgeGrad1" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.8" />
+                            <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.8" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Coordinate Grid Background */}
+                        <g opacity="0.15" stroke="#38455e" strokeWidth="0.8">
+                          <line strokeDasharray="3,3" x1="100" x2="100" y1="0" y2="520" />
+                          <line strokeDasharray="3,3" x1="250" x2="250" y1="0" y2="520" />
+                          <line strokeDasharray="3,3" x1="450" x2="450" y1="0" y2="520" />
+                          <line strokeDasharray="3,3" x1="600" x2="600" y1="0" y2="520" />
+                          <line strokeDasharray="3,3" x1="0" x2="700" y1="130" y2="130" />
+                          <line strokeDasharray="3,3" x1="0" x2="700" y1="260" y2="260" />
+                          <line strokeDasharray="3,3" x1="0" x2="700" y1="390" y2="390" />
+                          <circle
+                            cx="350"
+                            cy="260"
+                            fill="none"
+                            r="160"
+                            stroke="#22d3ee"
+                            strokeDasharray="4,6"
+                            strokeOpacity="0.2"
+                          />
+                          <circle
+                            cx="350"
+                            cy="260"
+                            fill="none"
+                            r="230"
+                            stroke="#a855f7"
+                            strokeDasharray="2,4"
+                            strokeOpacity="0.15"
+                          />
+                        </g>
+
+                        {/* Synaptic Interconnect Vectors */}
+                        <g strokeLinecap="round" strokeWidth="1.6">
+                          {/* Problem -> Dataset */}
+                          <line
+                            className="animate-pulse"
+                            stroke="url(#edgeGrad1)"
+                            strokeDasharray="5,3"
+                            x1="350"
+                            x2="160"
+                            y1="260"
+                            y2="140"
+                          />
+                          {/* Problem -> Model */}
+                          <line stroke="#06b6d4" strokeOpacity="0.7" x1="350" x2="540" y1="260" y2="150" />
+                          {/* Problem -> Paper */}
+                          <line stroke="#8b5cf6" strokeOpacity="0.7" x1="350" x2="530" y1="260" y2="380" />
+                          {/* Problem -> Benchmark */}
+                          <line stroke="#4edea3" strokeOpacity="0.7" x1="350" x2="180" y1="260" y2="380" />
+                          {/* Problem -> Implementation */}
+                          <line stroke="#22d3ee" strokeOpacity="0.8" x1="350" x2="350" y1="260" y2="80" />
+                          {/* Cross Dependencies */}
+                          <line stroke="#38455e" strokeDasharray="2,4" x1="160" x2="540" y1="140" y2="150" />
+                          <line stroke="#38455e" strokeDasharray="2,4" x1="540" x2="530" y1="150" y2="380" />
+                          <line stroke="#38455e" strokeDasharray="2,4" x1="180" x2="350" y1="380" y2="450" />
+                          <line stroke="#38455e" strokeDasharray="2,4" x1="350" x2="530" y1="450" y2="380" />
+                        </g>
+
+                        {/* Orbit Nodes */}
+                        {/* Node 1: DATASET */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("dataset")}
+                          transform="translate(160, 140)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="36"
+                            stroke={activeNodeKey === "dataset" ? "#22d3ee" : "#06b6d4"}
+                            strokeWidth={activeNodeKey === "dataset" ? 3 : 1.5}
+                          />
+                          <circle fill="url(#centerGlow)" r="44" />
+                          <text fill="#22d3ee" fontFamily="Space Grotesk" fontSize="11" fontWeight="700" textAnchor="middle" y="-5">
+                            DATASET
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="10">
+                            ADNI-3 (845 Sub)
+                          </text>
+                          <text fill="#4edea3" fontFamily="JetBrains Mono" fontSize="7" textAnchor="middle" y="20">
+                            94% FIT
+                          </text>
+                        </g>
+
+                        {/* Node 2: MODEL */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("model")}
+                          transform="translate(540, 150)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="36"
+                            stroke={activeNodeKey === "model" ? "#c084fc" : "#8b5cf6"}
+                            strokeWidth={activeNodeKey === "model" ? 3 : 1.5}
+                          />
+                          <circle fill="url(#purpleGlow)" r="44" />
+                          <text fill="#d0bcff" fontFamily="Space Grotesk" fontSize="11" fontWeight="700" textAnchor="middle" y="-5">
+                            MODEL
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="10">
+                            Swin UNETR 3D
+                          </text>
+                          <text fill="#4edea3" fontFamily="JetBrains Mono" fontSize="7" textAnchor="middle" y="20">
+                            9.4GB PEAK
+                          </text>
+                        </g>
+
+                        {/* Node 3: PAPER */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("paper")}
+                          transform="translate(530, 380)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="34"
+                            stroke={activeNodeKey === "paper" ? "#22d3ee" : "#38455e"}
+                            strokeWidth={activeNodeKey === "paper" ? 2.5 : 1.5}
+                          />
+                          <text fill="#f8fafc" fontFamily="Space Grotesk" fontSize="11" fontWeight="700" textAnchor="middle" y="-5">
+                            PAPER
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="10">
+                            CVPR &apos;24 Fusion
+                          </text>
+                          <text fill="#22d3ee" fontFamily="JetBrains Mono" fontSize="7" textAnchor="middle" y="20">
+                            342 CITES
+                          </text>
+                        </g>
+
+                        {/* Node 4: BENCHMARK */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("benchmark")}
+                          transform="translate(180, 380)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="34"
+                            stroke={activeNodeKey === "benchmark" ? "#6ee7b7" : "#4edea3"}
+                            strokeWidth={activeNodeKey === "benchmark" ? 2.5 : 1.5}
+                          />
+                          <text fill="#4edea3" fontFamily="Space Grotesk" fontSize="11" fontWeight="700" textAnchor="middle" y="-5">
+                            BENCHMARK
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="10">
+                            BraTS / MedMNIST
+                          </text>
+                          <text fill="#d0bcff" fontFamily="JetBrains Mono" fontSize="7" textAnchor="middle" y="20">
+                            0.884 DICE
+                          </text>
+                        </g>
+
+                        {/* Node 5: PIPELINE */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("pipeline")}
+                          transform="translate(350, 80)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="30"
+                            stroke={activeNodeKey === "pipeline" ? "#38bdf8" : "#22d3ee"}
+                            strokeWidth={activeNodeKey === "pipeline" ? 2.5 : 1.5}
+                          />
+                          <text fill="#22d3ee" fontFamily="Space Grotesk" fontSize="10" fontWeight="700" textAnchor="middle" y="-3">
+                            PIPELINE
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="11">
+                            MONAI + Torch
+                          </text>
+                        </g>
+
+                        {/* Node 6: EXEC PLAN */}
+                        <g
+                          className="cursor-pointer group transition-transform"
+                          onClick={() => setActiveNodeKey("execPlan")}
+                          transform="translate(350, 450)"
+                        >
+                          <circle
+                            fill="#0d1322"
+                            r="28"
+                            stroke={activeNodeKey === "execPlan" ? "#c084fc" : "#8b5cf6"}
+                            strokeWidth={activeNodeKey === "execPlan" ? 2.5 : 1.5}
+                          />
+                          <text fill="#d0bcff" fontFamily="Space Grotesk" fontSize="10" fontWeight="700" textAnchor="middle" y="-2">
+                            EXEC PLAN
+                          </text>
+                          <text fill="#94a3b8" fontFamily="JetBrains Mono" fontSize="7" textAnchor="middle" y="10">
+                            8 Step Spec
+                          </text>
+                        </g>
+
+                        {/* Center Problem Core Node */}
+                        <g
+                          className="cursor-pointer group"
+                          onClick={() => setActiveNodeKey("core")}
+                          transform="translate(350, 260)"
+                        >
+                          <circle fill="url(#centerGlow)" r="52" />
+                          <circle fill="#080d1a" r="44" stroke="#06b6d4" strokeWidth="2" />
+                          <circle
+                            className="animate-spin"
+                            fill="none"
+                            r="47"
+                            stroke="#8b5cf6"
+                            strokeDasharray="4,4"
+                            strokeWidth="1"
+                            style={{ transformOrigin: "0 0", animationDuration: "25s" }}
+                          />
+                          <text fill="#f8fafc" fontFamily="Space Grotesk" fontSize="11" fontWeight="700" textAnchor="middle" y="-8">
+                            YOUR AI PROBLEM
+                          </text>
+                          <text fill="#22d3ee" fontFamily="JetBrains Mono" fontSize="9" fontWeight="600" textAnchor="middle" y="8">
+                            3D MRI TUMOR
+                          </text>
+                          <text fill="#4edea3" fontFamily="JetBrains Mono" fontSize="8" textAnchor="middle" y="21">
+                            VRAM: ≤12GB
+                          </text>
+                        </g>
+                      </svg>
+                    </div>
+
+                    {/* Bottom Floating Telemetry Overlay */}
+                    <div className="z-20 bg-void-elevated/95 backdrop-blur-md p-space-sm rounded-lg flex items-center justify-between shadow-lg border border-border-dim">
+                      <div className="flex items-center gap-space-md">
+                        <div className="flex flex-col">
+                          <span className="font-label-mono-sm text-[9px] text-text-muted uppercase">
+                            Selected Focal
+                          </span>
+                          <span className="font-headline-sm text-[13px] text-text-primary font-bold">
+                            {activeNode.name} · {activeNode.sub}
+                          </span>
+                        </div>
+                        <div className="h-6 w-px bg-surface-bright" />
+                        <div className="flex flex-col">
+                          <span className="font-label-mono-sm text-[9px] text-text-muted uppercase">
+                            Theoretical Peak
+                          </span>
+                          <span className="font-label-mono text-label-mono text-tertiary">
+                            {activeNode.vram || "9.4 GB / 12.0 GB (78.3%)"}
+                          </span>
+                        </div>
+                      </div>
+                      <Link
+                        className="px-space-sm py-space-xs rounded bg-surface-container-high hover:bg-surface-bright text-primary font-label-mono-sm text-label-mono-sm flex items-center gap-space-2xs transition-colors border border-border-dim"
+                        href="/benchmark"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">tune</span>
+                        <span>Adjust Constraints</span>
+                      </Link>
                     </div>
                   </div>
                 </div>
               </div>
+            </section>
+          </div>
 
-              {/* Interactive AI Query Terminal Column */}
-              <div className="lg:col-span-7">
-                <QueryTerminal />
+          {/* ============================================================ */}
+          {/* 2. 'FROM PROBLEM → EVIDENCE → SOLUTION' 4-STAGE PIPELINE     */}
+          {/* ============================================================ */}
+          <section className="w-full px-grid-margin-desktop py-space-2xl bg-void-base relative border-y border-border-dim">
+            <div className="max-w-[1600px] mx-auto flex flex-col gap-space-xl">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+                <div className="flex flex-col gap-space-2xs">
+                  <div className="font-label-mono-sm text-label-mono-sm text-primary uppercase tracking-widest flex items-center gap-space-xs font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-radiant animate-pulse" />
+                    FOUR-STAGE DETERMINISTIC REASONING ENGINE
+                  </div>
+                  <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                    From Problem → Evidence → Solution
+                  </h2>
+                </div>
+                <p className="font-body-sm text-body-sm text-text-muted max-w-md">
+                  How our hybrid pipeline decodes unconstrained natural language queries into exact, mathematically constrained deep learning artifacts.
+                </p>
+              </div>
+
+              {/* 4-Column Pipeline Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-lg">
+                {/* Stage 01 */}
+                <div className="bg-surface-container-low rounded-xl p-space-lg flex flex-col justify-between shadow-md relative overflow-hidden group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-full pointer-events-none" />
+                  <div className="flex flex-col gap-space-md">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono text-label-mono text-primary bg-void-surface px-space-sm py-space-2xs rounded border border-border-dim">
+                        STAGE 01
+                      </span>
+                      <span className="material-symbols-outlined text-primary text-[22px]">psychology</span>
+                    </div>
+                    <div className="flex flex-col gap-space-xs">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary uppercase">
+                        01. Understand
+                      </h3>
+                      <span className="font-label-mono-sm text-label-mono-sm text-cyan-radiant font-semibold">
+                        SEMANTIC &amp; CONSTRAINT PARSING
+                      </span>
+                      <p className="font-body-sm text-body-sm text-text-muted mt-space-xs">
+                        Clinical objectives, tensor dimensions, batch constraints, compute ceilings (e.g. 12GB VRAM), and license boundaries are decomposed into rigorous formal predicates.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-space-md mt-space-md bg-void-surface/50 -mx-space-lg -mb-space-lg p-space-md flex flex-col gap-space-xs border-t border-border-dim/40">
+                    <span className="font-label-mono-sm text-[10px] text-text-muted">PARSED KEYWORDS</span>
+                    <div className="flex flex-wrap gap-space-2xs">
+                      <span className="px-space-xs py-space-2xs rounded bg-surface-container font-label-mono-sm text-[9px] text-text-primary">
+                        Volumetric 3D
+                      </span>
+                      <span className="px-space-xs py-space-2xs rounded bg-surface-container font-label-mono-sm text-[9px] text-text-primary">
+                        Dice Metric
+                      </span>
+                      <span className="px-space-xs py-space-2xs rounded bg-surface-container font-label-mono-sm text-[9px] text-text-primary">
+                        &lt;12GB Budget
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage 02 */}
+                <div className="bg-surface-container-low rounded-xl p-space-lg flex flex-col justify-between shadow-md relative overflow-hidden group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-bl-full pointer-events-none" />
+                  <div className="flex flex-col gap-space-md">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono text-label-mono text-secondary bg-void-surface px-space-sm py-space-2xs rounded border border-border-dim">
+                        STAGE 02
+                      </span>
+                      <span className="material-symbols-outlined text-secondary text-[22px]">travel_explore</span>
+                    </div>
+                    <div className="flex flex-col gap-space-xs">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary uppercase">
+                        02. Discover
+                      </h3>
+                      <span className="font-label-mono-sm text-label-mono-sm text-secondary font-semibold">
+                        HYBRID RETRIEVAL VECTOR + BM25
+                      </span>
+                      <p className="font-body-sm text-body-sm text-text-muted mt-space-xs">
+                        Simultaneously scans 15,000+ benchmarked datasets and 46,000+ pretrained neural backbones across dense embedding spaces and symbolic inverted indices.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-space-md mt-space-md bg-void-surface/50 -mx-space-lg -mb-space-lg p-space-md flex flex-col gap-space-xs border-t border-border-dim/40">
+                    <span className="font-label-mono-sm text-[10px] text-text-muted">RETRIEVAL STATS</span>
+                    <div className="flex justify-between items-center font-label-mono-sm text-[10px]">
+                      <span className="text-text-muted">Dense Candidates:</span>
+                      <span className="text-secondary font-bold">142 hits</span>
+                    </div>
+                    <div className="flex justify-between items-center font-label-mono-sm text-[10px]">
+                      <span className="text-text-muted">BM25 Metadata:</span>
+                      <span className="text-secondary font-bold">38 hits</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage 03 */}
+                <div className="bg-surface-container-low rounded-xl p-space-lg flex flex-col justify-between shadow-md relative overflow-hidden group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-tertiary/5 rounded-bl-full pointer-events-none" />
+                  <div className="flex flex-col gap-space-md">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono text-label-mono text-tertiary bg-void-surface px-space-sm py-space-2xs rounded border border-border-dim">
+                        STAGE 03
+                      </span>
+                      <span className="material-symbols-outlined text-tertiary text-[22px]">verified_user</span>
+                    </div>
+                    <div className="flex flex-col gap-space-xs">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary uppercase">
+                        03. Verify
+                      </h3>
+                      <span className="font-label-mono-sm text-label-mono-sm text-tertiary font-semibold">
+                        VRAM PROFILING &amp; PEER SCORES
+                      </span>
+                      <p className="font-body-sm text-body-sm text-text-muted mt-space-xs">
+                        Eliminates out-of-memory traps through rigorous empirical tensor execution profiling, verifiable license screening, and automated code reproducibility audits.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-space-md mt-space-md bg-void-surface/50 -mx-space-lg -mb-space-lg p-space-md flex flex-col gap-space-xs border-t border-border-dim/40">
+                    <span className="font-label-mono-sm text-[10px] text-text-muted">VERIFIED AUDIT</span>
+                    <div className="flex justify-between items-center font-label-mono-sm text-[10px]">
+                      <span className="text-text-muted">VRAM Footprint:</span>
+                      <span className="text-tertiary font-bold">9.4 GB Peak (PASS)</span>
+                    </div>
+                    <div className="flex justify-between items-center font-label-mono-sm text-[10px]">
+                      <span className="text-text-muted">Replication Score:</span>
+                      <span className="text-tertiary font-bold">98.4% Bit-Exact</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage 04 */}
+                <div className="bg-surface-container-low rounded-xl p-space-lg flex flex-col justify-between shadow-md relative overflow-hidden group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-radiant/5 rounded-bl-full pointer-events-none" />
+                  <div className="flex flex-col gap-space-md">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono text-label-mono text-cyan-radiant bg-void-surface px-space-sm py-space-2xs rounded border border-border-dim">
+                        STAGE 04
+                      </span>
+                      <span className="material-symbols-outlined text-cyan-radiant text-[22px]">rocket_launch</span>
+                    </div>
+                    <div className="flex flex-col gap-space-xs">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary uppercase">
+                        04. Recommend
+                      </h3>
+                      <span className="font-label-mono-sm text-label-mono-sm text-cyan-radiant font-semibold">
+                        RANKED SYNTHESIZED TRIAD
+                      </span>
+                      <p className="font-body-sm text-body-sm text-text-muted mt-space-xs">
+                        Outputs an orchestrated research ecosystem: primary verified dataset, fitted model weights, peer-reviewed methodology paper, and a step-by-step reproduction roadmap.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-space-md mt-space-md bg-void-surface/50 -mx-space-lg -mb-space-lg p-space-md flex flex-col gap-space-xs border-t border-border-dim/40">
+                    <span className="font-label-mono-sm text-[10px] text-text-muted">DELIVERABLE ARTIFACT</span>
+                    <div className="flex items-center gap-space-xs text-primary font-label-mono-sm text-[10px] font-bold">
+                      <span className="material-symbols-outlined text-[14px]">download_done</span>
+                      <span>Complete Reproduction Plan</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
           {/* ============================================================ */}
-          {/* FEDERATED REGISTRY ECOSYSTEM TICKER                          */}
+          {/* 3. 6-WAY KNOWLEDGE ECOSYSTEM & HORIZON FLOW                  */}
           {/* ============================================================ */}
-          <section className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 font-label-code text-[12px] text-cyan-300 uppercase tracking-widest font-bold">
-                  <span className="w-2 h-0.5 bg-cyan-400 inline-block" />
-                  Federated Ecosystem Telemetry
-                </div>
-                <h2 className="font-headline-md text-2xl md:text-3xl font-bold text-white mt-1">
-                  Synchronized with Top Open-Weight Registries
+          <section className="w-full px-grid-margin-desktop py-space-3xl bg-surface-container-lowest">
+            <div className="max-w-[1600px] mx-auto flex flex-col gap-space-xl">
+              <div className="flex flex-col gap-space-2xs">
+                <span className="font-label-mono-sm text-label-mono-sm text-secondary uppercase tracking-wider font-bold">
+                  UNIFIED MULTI-ENTITY ONTOLOGY
+                </span>
+                <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                  One Problem. An Entire Research Ecosystem.
                 </h2>
-              </div>
-              <p className="font-body-sm text-slate-300 text-sm max-w-md font-medium">
-                Continuously mapped into Pinecone vector index with real-time paper citations and automated license audits.
-              </p>
-            </div>
-
-            {/* Ecosystem Grid Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-              {/* Kaggle */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.35)] transition-all flex flex-col"
-                href="https://www.kaggle.com/datasets"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-cyan-950/70 border border-cyan-400/50 flex items-center justify-center font-headline-sm font-bold text-cyan-300 text-sm shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-                    K
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-cyan-300 transition-colors">Kaggle</span>
-                <span className="font-label-code text-[12px] text-cyan-300 mt-1 font-bold">64,200+ Sets</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">Tabular &amp; Multimodal</span>
-              </a>
-
-              {/* Hugging Face */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-amber-500/30 hover:border-amber-400 hover:shadow-[0_0_25px_rgba(245,158,11,0.35)] transition-all flex flex-col"
-                href="https://huggingface.co/datasets"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-amber-950/50 border border-amber-400/50 flex items-center justify-center text-lg shadow-[0_0_10px_rgba(245,158,11,0.3)]">
-                    🤗
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-amber-300 transition-colors">Hugging Face</span>
-                <span className="font-label-code text-[12px] text-amber-300 mt-1 font-bold">58,400+ Models</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">Transformers &amp; Hub</span>
-              </a>
-
-              {/* arXiv ML */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-violet-500/30 hover:border-violet-400 hover:shadow-[0_0_25px_rgba(139,92,246,0.35)] transition-all flex flex-col"
-                href="https://arxiv.org/"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-violet-950/70 border border-violet-400/50 flex items-center justify-center font-label-code font-bold text-violet-300 text-sm shadow-[0_0_10px_rgba(139,92,246,0.3)]">
-                    αX
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-violet-300 transition-colors">arXiv ML</span>
-                <span className="font-label-code text-[12px] text-violet-300 mt-1 font-bold">22,800+ Papers</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">SOTA Architectures</span>
-              </a>
-
-              {/* Papers With Code */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-indigo-500/30 hover:border-indigo-400 hover:shadow-[0_0_25px_rgba(99,102,241,0.35)] transition-all flex flex-col"
-                href="https://paperswithcode.com/"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-950/70 border border-indigo-400/50 flex items-center justify-center text-base shadow-[0_0_10px_rgba(99,102,241,0.3)]">
-                    📄
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-indigo-300 transition-colors">Papers w/ Code</span>
-                <span className="font-label-code text-[12px] text-indigo-300 mt-1 font-bold">12,000+ SOTA</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">Leaderboard Benchmarks</span>
-              </a>
-
-              {/* UCI Machine */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-emerald-500/30 hover:border-emerald-400 hover:shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all flex flex-col"
-                href="https://archive.ics.uci.edu/"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-950/70 border border-emerald-400/50 flex items-center justify-center font-label-code font-bold text-emerald-300 text-xs shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                    UCI
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-emerald-300 transition-colors">UCI Machine</span>
-                <span className="font-label-code text-[12px] text-emerald-300 mt-1 font-bold">700+ Baselines</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">Verified Standards</span>
-              </a>
-
-              {/* GitHub AI */}
-              <a
-                className="group glass-card specular-border p-4 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.35)] transition-all flex flex-col"
-                href="https://github.com/"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-900 border border-cyan-400/40 flex items-center justify-center font-label-code font-bold text-white text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-                    GH
-                  </div>
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </div>
-                <span className="font-headline-sm text-[15px] font-bold text-white group-hover:text-cyan-300 transition-colors">GitHub AI</span>
-                <span className="font-label-code text-[12px] text-cyan-300 mt-1 font-bold">4,500+ Starters</span>
-                <span className="text-[11px] text-slate-300 mt-2 font-medium">Production PyTorch</span>
-              </a>
-            </div>
-          </section>
-
-          {/* ============================================================ */}
-          {/* FUTURISTIC ARCHITECTURAL PIPELINE CIRCUIT GRAPH              */}
-          {/* ============================================================ */}
-          <section className="flex flex-col gap-8">
-            <div className="text-center max-w-3xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-950/70 border border-cyan-400/50 text-cyan-300 font-label-code text-[11px] uppercase tracking-wider mb-3 shadow-[0_0_14px_rgba(6,182,212,0.25)] font-bold">
-                <span className="material-symbols-outlined text-[15px]">account_tree</span>
-                End-to-End Deep Nexus Flow
-              </div>
-              <h2 className="font-headline-lg text-3xl md:text-4xl font-extrabold text-white">
-                From Project Intent to Model Serving in Seconds
-              </h2>
-              <p className="font-body-md text-slate-300 mt-2 font-medium">
-                Every query traverses our federated vector mesh to produce grounded pairings, hardware envelopes, and ready-to-run PyTorch scripts.
-              </p>
-            </div>
-
-            {/* 4 Nodes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Node 01 */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-cyan-500/30 hover:border-cyan-400 transition-all group flex flex-col relative shadow-[0_0_20px_rgba(6,182,212,0.15)]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-label-code text-[11px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-400/40 px-2.5 py-1 rounded-md shadow-[0_0_8px_rgba(6,182,212,0.3)]">
-                    NODE 01
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(6,182,212,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">query_stats</span>
-                  </div>
-                </div>
-                <h3 className="font-headline-sm text-[17px] font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">
-                  Query Intent Parser
-                </h3>
-                <p className="font-body-sm text-slate-300 text-sm mb-4 leading-relaxed font-normal">
-                  Deconstructs natural language inputs into dimensional metadata: task modality, context limits, license tags, and precision targets.
+                <p className="font-body-md text-body-md text-text-muted max-w-3xl">
+                  Tracing how a single clinical query propagates across the multi-entity knowledge network with verified match confidence scores and automated dependency links.
                 </p>
-                <div className="mt-auto rounded-xl bg-[#090f1d] border border-cyan-500/20 p-3 font-label-code text-[11px] text-slate-200 flex flex-col gap-1">
-                  <div><span className="text-cyan-300 font-semibold">task_type:</span> &quot;VLM Medical&quot;</div>
-                  <div><span className="text-indigo-300 font-semibold">ctx_tokens:</span> 4,096 tokens</div>
-                  <div><span className="text-emerald-300 font-semibold">license:</span> &quot;MIT / Apache-2&quot;</div>
-                </div>
               </div>
 
-              {/* Node 02 */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-indigo-500/30 hover:border-indigo-400 transition-all group flex flex-col relative shadow-[0_0_20px_rgba(99,102,241,0.15)]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-label-code text-[11px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-400/40 px-2.5 py-1 rounded-md shadow-[0_0_8px_rgba(99,102,241,0.3)]">
-                    NODE 02
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(99,102,241,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">travel_explore</span>
-                  </div>
-                </div>
-                <h3 className="font-headline-sm text-[17px] font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
-                  Hybrid Vector Search
-                </h3>
-                <p className="font-body-sm text-slate-300 text-sm mb-4 leading-relaxed font-normal">
-                  Dual-retrieval combining 1536-dim Pinecone dense embeddings with BM25 lexical token matching across verified datasets.
-                </p>
-                <div className="mt-auto rounded-xl bg-[#090f1d] border border-indigo-500/20 p-3 font-label-code text-[11px] text-slate-200 flex flex-col gap-1">
-                  <div><span className="text-indigo-300 font-semibold">dense_cosine:</span> 0.962</div>
-                  <div><span className="text-cyan-300 font-semibold">bm25_score:</span> 24.18</div>
-                  <div><span className="text-emerald-300 font-semibold">candidate_pool:</span> 380 assets</div>
-                </div>
-              </div>
-
-              {/* Node 03 */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-400 transition-all group flex flex-col relative shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-label-code text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-400/40 px-2.5 py-1 rounded-md shadow-[0_0_8px_rgba(16,185,129,0.3)]">
-                    NODE 03
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">memory</span>
-                  </div>
-                </div>
-                <h3 className="font-headline-sm text-[17px] font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">
-                  AI Sizing &amp; VRAM Engine
-                </h3>
-                <p className="font-body-sm text-slate-300 text-sm mb-4 leading-relaxed font-normal">
-                  Calculates parameter footprint, optimizer state memory, KV-cache growth, and quantization loss metrics.
-                </p>
-                <div className="mt-auto rounded-xl bg-[#090f1d] border border-emerald-500/20 p-3 font-label-code text-[11px] text-slate-200 flex flex-col gap-1">
-                  <div><span className="text-emerald-300 font-semibold">fit_status:</span> &quot;RTX 4090 Ready&quot;</div>
-                  <div><span className="text-cyan-300 font-semibold">overhead_margin:</span> 38% free</div>
-                  <div><span className="text-indigo-300 font-semibold">quant_scheme:</span> AWQ 4-bit / FP16</div>
-                </div>
-              </div>
-
-              {/* Node 04 */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-violet-500/30 hover:border-violet-400 transition-all group flex flex-col relative shadow-[0_0_20px_rgba(139,92,246,0.15)]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-label-code text-[11px] font-bold text-violet-300 bg-violet-950/80 border border-violet-400/40 px-2.5 py-1 rounded-md shadow-[0_0_8px_rgba(139,92,246,0.3)]">
-                    NODE 04
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-400/40 flex items-center justify-center text-violet-300 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(139,92,246,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">terminal</span>
-                  </div>
-                </div>
-                <h3 className="font-headline-sm text-[17px] font-bold text-white mb-2 group-hover:text-violet-300 transition-colors">
-                  Production Roadmap &amp; Code
-                </h3>
-                <p className="font-body-sm text-slate-300 text-sm mb-4 leading-relaxed font-normal">
-                  Generates a structured 5-phase engineering checklist alongside production LoRA scripts and FastAPI vLLM endpoints.
-                </p>
-                <div className="mt-auto rounded-xl bg-[#090f1d] border border-violet-500/20 p-3 font-label-code text-[11px] text-slate-200 flex flex-col gap-1">
-                  <div><span className="text-violet-300 font-semibold">engine:</span> vLLM + Triton</div>
-                  <div><span className="text-cyan-300 font-semibold">starter_script:</span> train_qlora.py</div>
-                  <div><span className="text-emerald-300 font-semibold">phases:</span> 5 steps generated</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ============================================================ */}
-          {/* LIVE HARDWARE FEASIBILITY & VRAM PROFILER WORKSTATION        */}
-          {/* ============================================================ */}
-          <HardwareEstimator />
-
-          {/* ============================================================ */}
-          {/* ENTERPRISE CAPABILITIES & LIVE BENCHMARKS PREVIEW            */}
-          {/* ============================================================ */}
-          <section className="flex flex-col gap-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 font-label-code text-[12px] text-cyan-300 uppercase tracking-widest font-bold">
-                  <span className="w-2 h-0.5 bg-cyan-400 inline-block" />
-                  High-Precision ML Tooling
-                </div>
-                <h2 className="font-headline-lg text-3xl md:text-4xl font-extrabold text-white mt-1">
-                  Engineered for Production Intelligence
-                </h2>
-              </div>
-              <p className="font-body-sm text-slate-300 text-sm max-w-md font-medium">
-                Evaluate throughput, inspect memory profiles, and export automated fine-tuning recipes without configuration fatigue.
-              </p>
-            </div>
-
-            {/* Bento Grid 3 Columns */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Card 1: Multi-Model Benchmark Lab with Mini Sparkline */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-cyan-500/30 hover:border-cyan-400 transition-all flex flex-col justify-between shadow-[0_0_20px_rgba(6,182,212,0.15)]">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 mb-4 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">balance</span>
-                  </div>
-                  <h3 className="font-headline-sm text-lg font-bold text-white mb-2">
-                    Multi-Model Benchmark Lab
-                  </h3>
-                  <p className="font-body-sm text-slate-300 text-sm leading-relaxed font-normal">
-                    Head-to-head evaluation across latency distributions, FP16 vs INT4 perplexity preservation, and commercial license safety.
-                  </p>
-                </div>
-
-                {/* Mini Sparkline Latency Chart */}
-                <div className="mt-6 rounded-xl bg-[#090f1d] border border-cyan-500/20 p-4 shadow-inner">
-                  <div className="flex justify-between items-center font-label-code text-[11px] mb-3 text-slate-300 font-medium">
-                    <span>Inference Latency (ms/token)</span>
-                    <span className="text-cyan-300 font-bold">vLLM Engine</span>
-                  </div>
-                  <div className="flex items-end gap-2.5 h-20 pt-2 border-b border-slate-700/80 pb-2">
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <div className="w-full bg-cyan-500/40 rounded-t h-[45%] border-t border-cyan-300" />
-                      <span className="font-label-code text-[10px] text-slate-300 font-medium">Mistral</span>
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <div className="w-full bg-cyan-400 rounded-t h-[30%] shadow-[0_0_14px_rgba(34,211,238,0.7)]" />
-                      <span className="font-label-code text-[10px] text-cyan-200 font-bold">Llama-3</span>
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <div className="w-full bg-indigo-500/50 rounded-t h-[75%] border-t border-indigo-300" />
-                      <span className="font-label-code text-[10px] text-slate-300 font-medium">Qwen-2</span>
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <div className="w-full bg-emerald-500/50 rounded-t h-[38%] border-t border-emerald-300" />
-                      <span className="font-label-code text-[10px] text-slate-300 font-medium">Gemma-2</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] font-label-code text-slate-400 pt-2">
-                    <span>Lower is faster</span>
-                    <span className="text-emerald-300 font-bold">Llama-3: 14.8 ms/tok</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Production Code Generator with Interactive Tab */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-indigo-500/30 hover:border-indigo-400 transition-all flex flex-col justify-between shadow-[0_0_20px_rgba(99,102,241,0.15)]">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 mb-4 shadow-[0_0_10px_rgba(99,102,241,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">code</span>
-                  </div>
-                  <h3 className="font-headline-sm text-lg font-bold text-white mb-2">
-                    Automated LoRA &amp; Serve Scripts
-                  </h3>
-                  <p className="font-body-sm text-slate-300 text-sm leading-relaxed font-normal">
-                    Generates modular scripts with PEFT configurations, FlashAttention-2 flags, and FastAPI endpoints ready for cloud deployment.
-                  </p>
-                </div>
-
-                {/* Live Code Preview Tab */}
-                <div className="mt-6 rounded-xl bg-[#090f1d] border border-indigo-500/25 p-3.5 font-label-code text-[11px] shadow-inner">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-700/80 text-slate-300 mb-2">
-                    <span className="text-indigo-300 flex items-center gap-1 font-bold">
-                      <span className="material-symbols-outlined text-[13px]">description</span>
-                      train_qlora.py
+              {/* Entity Flow Horizon Container */}
+              <div className="w-full bg-void-surface rounded-xl p-space-xl shadow-xl overflow-x-auto border border-border-dim">
+                <div className="min-w-[1100px] flex items-center justify-between relative py-space-lg">
+                  {/* Node: User Query */}
+                  <div className="w-48 bg-void-elevated p-space-md rounded-lg shadow-md flex flex-col gap-space-xs relative z-10 border border-border-dim">
+                    <span className="font-label-mono-sm text-[10px] text-cyan-radiant font-bold">
+                      01 · USER QUERY
                     </span>
-                    <button
-                      className="text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-semibold"
-                      onClick={handleCopySnippet}
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[12px]">content_copy</span>
-                      <span className={copiedCode ? "text-emerald-300 font-bold" : ""}>
-                        {copiedCode ? "Copied!" : "Copy"}
+                    <span className="font-headline-sm text-[14px] text-text-primary font-bold truncate">
+                      3D MRI Scan
+                    </span>
+                    <span className="font-body-sm text-[11px] text-text-muted">
+                      Tumor + Progression, &lt;12GB VRAM
+                    </span>
+                    <div className="mt-space-2xs pt-space-2xs bg-surface-container/50 px-space-xs py-space-2xs rounded flex items-center justify-between border border-border-dim/40">
+                      <span className="font-label-mono-sm text-[9px] text-text-muted">STATUS</span>
+                      <span className="font-label-mono-sm text-[9px] text-tertiary font-bold">RESOLVED</span>
+                    </div>
+                  </div>
+
+                  {/* Connector Vector 1 */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-space-xs relative z-0">
+                    <span className="font-label-mono-sm text-[10px] text-primary mb-1 font-bold">
+                      94% MATCH
+                    </span>
+                    <div className="w-full h-0.5 bg-gradient-to-r from-primary to-secondary relative">
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-secondary animate-ping" />
+                    </div>
+                    <span className="font-label-mono-sm text-[9px] text-text-muted mt-1">
+                      SEMANTIC EMBEDDING
+                    </span>
+                  </div>
+
+                  {/* Node: Dataset */}
+                  <div className="w-48 bg-void-elevated p-space-md rounded-lg shadow-md flex flex-col gap-space-xs relative z-10 border border-border-dim">
+                    <span className="font-label-mono-sm text-[10px] text-primary font-bold">
+                      02 · DATASET
+                    </span>
+                    <span className="font-headline-sm text-[14px] text-text-primary font-bold truncate">
+                      ADNI-3 Cohort
+                    </span>
+                    <span className="font-body-sm text-[11px] text-text-muted">
+                      845 Subjects · 2,248 Scans
+                    </span>
+                    <div className="mt-space-2xs pt-space-2xs bg-surface-container/50 px-space-xs py-space-2xs rounded flex items-center justify-between border border-border-dim/40">
+                      <span className="font-label-mono-sm text-[9px] text-text-muted">FORMAT</span>
+                      <span className="font-label-mono-sm text-[9px] text-primary font-bold">3D NIfTI</span>
+                    </div>
+                  </div>
+
+                  {/* Connector Vector 2 */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-space-xs relative z-0">
+                    <span className="font-label-mono-sm text-[10px] text-secondary mb-1 font-bold">
+                      COMPATIBLE
+                    </span>
+                    <div className="w-full h-0.5 bg-gradient-to-r from-secondary to-purple-bright relative" />
+                    <span className="font-label-mono-sm text-[9px] text-text-muted mt-1">
+                      VOLUMETRIC BACKBONE
+                    </span>
+                  </div>
+
+                  {/* Node: Model */}
+                  <div className="w-48 bg-void-elevated p-space-md rounded-lg shadow-md flex flex-col gap-space-xs relative z-10 border border-border-dim">
+                    <span className="font-label-mono-sm text-[10px] text-secondary font-bold">
+                      03 · ARCHITECTURE
+                    </span>
+                    <span className="font-headline-sm text-[14px] text-text-primary font-bold truncate">
+                      Swin UNETR
+                    </span>
+                    <span className="font-body-sm text-[11px] text-text-muted">
+                      3D Hierarchical Transformer
+                    </span>
+                    <div className="mt-space-2xs pt-space-2xs bg-surface-container/50 px-space-xs py-space-2xs rounded flex items-center justify-between border border-border-dim/40">
+                      <span className="font-label-mono-sm text-[9px] text-text-muted">PEAK VRAM</span>
+                      <span className="font-label-mono-sm text-[9px] text-tertiary font-bold">9.4 GB</span>
+                    </div>
+                  </div>
+
+                  {/* Connector Vector 3 */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-space-xs relative z-0">
+                    <span className="font-label-mono-sm text-[10px] text-purple-bright mb-1 font-bold">
+                      CITATION REF
+                    </span>
+                    <div className="w-full h-0.5 bg-gradient-to-r from-purple-bright to-tertiary relative" />
+                    <span className="font-label-mono-sm text-[9px] text-text-muted mt-1">
+                      EMPIRICAL PROOF
+                    </span>
+                  </div>
+
+                  {/* Node: Paper */}
+                  <div className="w-48 bg-void-elevated p-space-md rounded-lg shadow-md flex flex-col gap-space-xs relative z-10 border border-border-dim">
+                    <span className="font-label-mono-sm text-[10px] text-purple-bright font-bold">
+                      04 · GROUNDING PAPER
+                    </span>
+                    <span className="font-headline-sm text-[14px] text-text-primary font-bold truncate">
+                      CVPR 2024
+                    </span>
+                    <span className="font-body-sm text-[11px] text-text-muted">
+                      Multimodal Neuro Repr.
+                    </span>
+                    <div className="mt-space-2xs pt-space-2xs bg-surface-container/50 px-space-xs py-space-2xs rounded flex items-center justify-between border border-border-dim/40">
+                      <span className="font-label-mono-sm text-[9px] text-text-muted">ARXIV</span>
+                      <span className="font-label-mono-sm text-[9px] text-purple-bright font-bold">2403.09182</span>
+                    </div>
+                  </div>
+
+                  {/* Connector Vector 4 */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-space-xs relative z-0">
+                    <span className="font-label-mono-sm text-[10px] text-tertiary mb-1 font-bold">
+                      VERIFIED SOTA
+                    </span>
+                    <div className="w-full h-0.5 bg-gradient-to-r from-tertiary to-cyan-radiant relative" />
+                    <span className="font-label-mono-sm text-[9px] text-text-muted mt-1">
+                      LEADERBOARD TOP-3
+                    </span>
+                  </div>
+
+                  {/* Node: Implementation */}
+                  <div className="w-48 bg-void-elevated p-space-md rounded-lg shadow-md flex flex-col gap-space-xs relative z-10 border border-border-dim">
+                    <span className="font-label-mono-sm text-[10px] text-tertiary font-bold">
+                      05 · IMPLEMENTATION
+                    </span>
+                    <span className="font-headline-sm text-[14px] text-text-primary font-bold truncate">
+                      MONAI + PyTorch
+                    </span>
+                    <span className="font-body-sm text-[11px] text-text-muted">
+                      Pretrained Checkpoint
+                    </span>
+                    <div className="mt-space-2xs pt-space-2xs bg-surface-container/50 px-space-xs py-space-2xs rounded flex items-center justify-between border border-border-dim/40">
+                      <span className="font-label-mono-sm text-[9px] text-text-muted">STATUS</span>
+                      <span className="font-label-mono-sm text-[9px] text-tertiary font-bold">1-CLICK RUN</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ============================================================ */}
+          {/* 4. THREE SCIENTIFIC INTELLIGENCE PREVIEWS                    */}
+          {/* ============================================================ */}
+          <section className="w-full px-grid-margin-desktop py-space-2xl bg-void-base border-y border-border-dim">
+            <div className="max-w-[1600px] mx-auto flex flex-col gap-space-xl">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+                <div className="flex flex-col gap-space-2xs">
+                  <span className="font-label-mono-sm text-label-mono-sm text-cyan-radiant uppercase tracking-wider font-bold">
+                    RETRIEVAL MATCH ARTIFACTS
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                    Scientific Intelligence Previews
+                  </h2>
+                </div>
+                <div className="flex items-center gap-space-sm font-label-mono-sm text-label-mono-sm text-text-muted">
+                  <span>SORTED BY RELEVANCE &amp; HARDWARE CONSTRAINTS</span>
+                </div>
+              </div>
+
+              {/* 3-Column Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-space-lg">
+                {/* Panel 1: DATASET */}
+                <div className="bg-surface-container rounded-xl overflow-hidden shadow-xl flex flex-col justify-between border border-border-dim">
+                  <div className="relative h-44 w-full bg-void-surface overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt="ADNI 3D Brain Imaging"
+                      className="w-full h-full object-cover opacity-60"
+                      src="/stitch-cards/adni-preview.png"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-surface-container/40 to-transparent" />
+                    <div className="absolute top-3 left-3 px-space-sm py-space-2xs rounded bg-void-base/90 font-label-mono-sm text-label-mono-sm text-primary flex items-center gap-space-xs border border-border-dim">
+                      <span className="material-symbols-outlined text-[14px]">database</span>
+                      <span className="font-bold">PRIMARY DATASET MATCH</span>
+                    </div>
+                    <div className="absolute top-3 right-3 px-space-sm py-space-2xs rounded bg-tertiary/20 text-tertiary font-label-mono text-label-mono font-bold">
+                      94% MATCH
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary font-bold">
+                        ADNI - Alzheimer&apos;s Disease Neuroimaging
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="p-space-lg flex flex-col gap-space-md flex-1 justify-between">
+                    <div className="flex flex-col gap-space-sm">
+                      <p className="font-body-sm text-body-sm text-text-muted">
+                        Standardized multi-site longitudinal 3D MRI, PET scans, CSF proteomics, and cognitive progression telemetry for clinical stage diagnosis.
+                      </p>
+                      {/* Metric Badges */}
+                      <div className="grid grid-cols-2 gap-space-xs font-label-mono-sm text-label-mono-sm">
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Volume Count</span>
+                          <span className="text-text-primary font-bold">2,248 Scans</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Tensor Format</span>
+                          <span className="text-primary font-bold">3D NIfTI / DICOM</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">License Type</span>
+                          <span className="text-tertiary font-bold">Research DUA</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Cohort Size</span>
+                          <span className="text-text-primary font-bold">845 Subjects</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-space-md flex items-center justify-between font-label-mono-sm text-label-mono-sm border-t border-border-dim/40">
+                      <span className="text-tertiary flex items-center gap-space-2xs">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        <span>Verified Data Access</span>
                       </span>
-                    </button>
+                      <Link
+                        className="text-primary hover:text-cyan-radiant font-bold flex items-center gap-space-2xs transition-colors"
+                        href="/explore?q=ADNI"
+                      >
+                        <span>View Schema</span>
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </Link>
+                    </div>
                   </div>
-                  <pre className="text-slate-200 overflow-x-auto leading-relaxed font-medium">
-                    <code>
-                      <span className="text-indigo-300 font-semibold">from</span> peft{" "}
-                      <span className="text-indigo-300 font-semibold">import</span> LoraConfig, get_peft_model
-                      {"\n"}
-                      <span className="text-slate-400"># Auto-configured for 24GB VRAM target</span>
-                      {"\n"}
-                      peft_config = LoraConfig(
-                      {"\n"}  r=16, lora_alpha=32,
-                      {"\n"}  target_modules=[
-                      <span className="text-emerald-300">&quot;q_proj&quot;</span>,{" "}
-                      <span className="text-emerald-300">&quot;v_proj&quot;</span>],
-                      {"\n"}  lora_dropout=0.05,
-                      {"\n"}  bias=<span className="text-emerald-300">&quot;none&quot;</span>,
-                      {"\n"}  task_type=<span className="text-cyan-300">&quot;CAUSAL_LM&quot;</span>
-                      {"\n"})
-                    </code>
-                  </pre>
+                </div>
+
+                {/* Panel 2: MODEL */}
+                <div className="bg-surface-container rounded-xl overflow-hidden shadow-xl flex flex-col justify-between border border-border-dim">
+                  <div className="relative h-44 w-full bg-void-surface overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt="Swin UNETR Attention"
+                      className="w-full h-full object-cover opacity-60"
+                      src="/stitch-cards/swin-preview.png"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-surface-container/40 to-transparent" />
+                    <div className="absolute top-3 left-3 px-space-sm py-space-2xs rounded bg-void-base/90 font-label-mono-sm text-label-mono-sm text-secondary flex items-center gap-space-xs border border-border-dim">
+                      <span className="material-symbols-outlined text-[14px]">neurology</span>
+                      <span className="font-bold">PRETRAINED BACKBONE</span>
+                    </div>
+                    <div className="absolute top-3 right-3 px-space-sm py-space-2xs rounded bg-secondary-container/40 text-secondary font-label-mono text-label-mono font-bold">
+                      89% MATCH
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary font-bold">
+                        Swin UNETR 3D Vision Transformer
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="p-space-lg flex flex-col gap-space-md flex-1 justify-between">
+                    <div className="flex flex-col gap-space-sm">
+                      <p className="font-body-sm text-body-sm text-text-muted">
+                        Hierarchical vision transformer with shifted windows for dense 3D medical image segmentation and volumetric representation extraction.
+                      </p>
+                      {/* Metric Badges */}
+                      <div className="grid grid-cols-2 gap-space-xs font-label-mono-sm text-label-mono-sm">
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Peak VRAM</span>
+                          <span className="text-tertiary font-bold">9.4 GB (RTX 3060/4070)</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Accuracy Metric</span>
+                          <span className="text-secondary font-bold">Dice: 0.884</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Parameter Scale</span>
+                          <span className="text-text-primary font-bold">62.2M Weights</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Framework</span>
+                          <span className="text-text-primary font-bold">PyTorch / MONAI</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-space-md flex items-center justify-between font-label-mono-sm text-label-mono-sm border-t border-border-dim/40">
+                      <span className="text-tertiary flex items-center gap-space-2xs">
+                        <span className="material-symbols-outlined text-[14px]">memory</span>
+                        <span>Fits 12GB GPU Budget</span>
+                      </span>
+                      <Link
+                        className="text-secondary hover:text-purple-bright font-bold flex items-center gap-space-2xs transition-colors"
+                        href="/benchmark"
+                      >
+                        <span>Inspect Weights</span>
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel 3: PAPER */}
+                <div className="bg-surface-container rounded-xl overflow-hidden shadow-xl flex flex-col justify-between border border-border-dim">
+                  <div className="relative h-44 w-full bg-void-surface overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt="Paper Schematic"
+                      className="w-full h-full object-cover opacity-60"
+                      src="/stitch-cards/paper-preview.png"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-surface-container/40 to-transparent" />
+                    <div className="absolute top-3 left-3 px-space-sm py-space-2xs rounded bg-void-base/90 font-label-mono-sm text-label-mono-sm text-purple-bright flex items-center gap-space-xs border border-border-dim">
+                      <span className="material-symbols-outlined text-[14px]">description</span>
+                      <span className="font-bold">PEER-REVIEWED PAPER</span>
+                    </div>
+                    <div className="absolute top-3 right-3 px-space-sm py-space-2xs rounded bg-tertiary/20 text-tertiary font-label-mono text-label-mono font-bold">
+                      92% MATCH
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <h3 className="font-headline-sm text-headline-sm text-text-primary font-bold">
+                        Multimodal Neuroimaging Representation
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="p-space-lg flex flex-col gap-space-md flex-1 justify-between">
+                    <div className="flex flex-col gap-space-sm">
+                      <p className="font-body-sm text-body-sm text-text-muted">
+                        Peer-reviewed methodology for fusing longitudinal structural MRI with tabular biomarkers under extreme label scarcity.
+                      </p>
+                      {/* Metric Badges */}
+                      <div className="grid grid-cols-2 gap-space-xs font-label-mono-sm text-label-mono-sm">
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Venue</span>
+                          <span className="text-primary font-bold">CVPR 2024</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Total Citations</span>
+                          <span className="text-text-primary font-bold">342 Verified</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-text-muted">Artifact Code</span>
+                          <span className="text-tertiary font-bold">Official GitHub</span>
+                        </div>
+                        <div className="bg-void-surface p-space-xs rounded flex flex-col border border-border-dim/40">
+                          <span className="text-secondary font-bold">Repro Score</span>
+                          <span className="text-secondary font-bold">98.2% SOTA</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-space-md flex items-center justify-between font-label-mono-sm text-label-mono-sm border-t border-border-dim/40">
+                      <span className="text-tertiary flex items-center gap-space-2xs">
+                        <span className="material-symbols-outlined text-[14px]">lock_open</span>
+                        <span>Open Access arXiv</span>
+                      </span>
+                      <Link
+                        className="text-purple-bright hover:text-secondary font-bold flex items-center gap-space-2xs transition-colors"
+                        href="/explore?q=Multimodal+Neuroimaging"
+                      >
+                        <span>Read Abstract</span>
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Card 3: 5-Phase Interactive Roadmap Preview */}
-              <div className="glass-card specular-border rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-400 transition-all flex flex-col justify-between shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 mb-4 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                    <span className="material-symbols-outlined text-[22px]">schema</span>
-                  </div>
-                  <h3 className="font-headline-sm text-lg font-bold text-white mb-2">
-                    Interactive Pipeline Roadmap
-                  </h3>
-                  <p className="font-body-sm text-slate-300 text-sm leading-relaxed font-normal">
-                    Step-by-step engineering sequence with milestone verifications, deduplication strategies, and deployment checklists.
-                  </p>
+              {/* Match Breakdown Horizontal Bar Metrics */}
+              <div className="bg-surface-container-low rounded-xl p-space-lg shadow-md flex flex-col gap-space-sm border border-border-dim">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+                  <span className="font-label-mono text-label-mono text-text-primary uppercase tracking-wider font-bold">
+                    COMPOSITE MULTI-OBJECTIVE 94% MATCH BREAKDOWN
+                  </span>
+                  <span className="font-label-mono-sm text-label-mono-sm text-tertiary font-bold">
+                    BALANCED HARMONIC MEAN: 0.942
+                  </span>
                 </div>
-
-                {/* Mini Checklist Preview */}
-                <div className="mt-6 rounded-xl bg-[#090f1d] border border-emerald-500/25 p-4 flex flex-col gap-2.5 font-label-code text-[11px] shadow-inner">
-                  <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                    <span className="material-symbols-outlined text-emerald-400 text-[16px] shadow-[0_0_6px_rgba(52,211,153,0.6)]">check_circle</span>
-                    <span>Phase 1: MinHash Token Deduplication</span>
+                {/* Composite Horizontal Bar */}
+                <div className="w-full h-4 rounded bg-void-surface overflow-hidden flex shadow-inner border border-border-dim/50">
+                  <div className="h-full bg-primary" style={{ width: "32%" }} title="Semantic Intent Match 32%" />
+                  <div className="h-full bg-cyan-radiant" style={{ width: "20%" }} title="Task & Modality Alignment 20%" />
+                  <div className="h-full bg-tertiary" style={{ width: "15%" }} title="VRAM & Hardware Budget Fit 15%" />
+                  <div className="h-full bg-purple-bright" style={{ width: "14%" }} title="Cross-Entity Graph Cohesion 14%" />
+                  <div className="h-full bg-secondary" style={{ width: "19%" }} title="Method Freshness & Benchmark Quality 19%" />
+                </div>
+                {/* Legend */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-space-sm pt-space-xs font-label-mono-sm text-label-mono-sm">
+                  <div className="flex items-center gap-space-xs">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-primary" />
+                    <span className="text-text-muted">Semantic Match (32%)</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-slate-100 font-medium">
-                    <span className="material-symbols-outlined text-emerald-400 text-[16px] shadow-[0_0_6px_rgba(52,211,153,0.6)]">check_circle</span>
-                    <span>Phase 2: FP16 Quantized Baseline Run</span>
+                  <div className="flex items-center gap-space-xs">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-cyan-radiant" />
+                    <span className="text-text-muted">Task Alignment (20%)</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-cyan-200 font-bold">
-                    <span className="material-symbols-outlined text-cyan-300 text-[16px] animate-spin">sync</span>
-                    <span>Phase 3: LoRA Rank Sweep &amp; Evaluation</span>
+                  <div className="flex items-center gap-space-xs">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-tertiary" />
+                    <span className="text-text-muted">VRAM Fit (15%)</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-slate-400 font-medium">
-                    <span className="material-symbols-outlined text-slate-500 text-[16px]">radio_button_unchecked</span>
-                    <span>Phase 4: GGUF Export &amp; Ollama Packaging</span>
+                  <div className="flex items-center gap-space-xs">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-purple-bright" />
+                    <span className="text-text-muted">Graph Cohesion (14%)</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-slate-400 font-medium">
-                    <span className="material-symbols-outlined text-slate-500 text-[16px]">radio_button_unchecked</span>
-                    <span>Phase 5: vLLM High-Concurrency Serving</span>
+                  <div className="flex items-center gap-space-xs">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-secondary" />
+                    <span className="text-text-muted">Freshness &amp; Q (19%)</span>
                   </div>
                 </div>
               </div>
@@ -652,93 +1368,192 @@ peft_config = LoraConfig(
           </section>
 
           {/* ============================================================ */}
-          {/* CREATOR SPOTLIGHT & ARCHITECTURE BRIEF                       */}
+          {/* 5. APPLIED EDGE CASES & TRADE-OFF BENCHMARK MATRIX           */}
           {/* ============================================================ */}
-          <section className="glass-card specular-border rounded-3xl p-6 md:p-10 border border-cyan-500/30 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-7 flex flex-col gap-4">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 font-label-code text-[11px] uppercase tracking-wider self-start font-bold shadow-[0_0_16px_rgba(6,182,212,0.35)]">
-                  <span className="material-symbols-outlined text-[15px] text-cyan-300">terminal</span>
-                  <span>Architected by Hammad Ali Tariq</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping ml-1" />
-                </div>
-                <h2 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-white">
-                  Built to Eliminate Friction in Deep Tech &amp; ML Pipelines
-                </h2>
-                <div className="flex flex-col gap-3">
-                  <div className="inline-flex items-center gap-2.5 p-1 px-3.5 rounded-xl bg-slate-900/90 border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)] self-start">
-                    <span className="material-symbols-outlined text-cyan-300 text-[18px]">verified</span>
-                    <span className="text-xs font-label-code text-slate-300 uppercase tracking-wider">Architected &amp; Engineered by</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-200 to-indigo-300 font-bold tracking-wide text-[16px]">Hammad Ali Tariq</span>
-                  </div>
-                  <p className="font-body-md text-slate-200 text-sm md:text-base leading-relaxed font-normal">
-                    AI Dataset Explorer integrates high-dimensional vector search, automated GPU hardware profiling, and production code generation into an elegant, unified developer platform.
+          <section className="w-full px-grid-margin-desktop py-space-3xl bg-surface-container-lowest">
+            <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-space-xl">
+              {/* Left: Built for Problems That Aren't Simple */}
+              <div className="xl:col-span-5 flex flex-col gap-space-lg">
+                <div className="flex flex-col gap-space-2xs">
+                  <span className="font-label-mono-sm text-label-mono-sm text-primary uppercase tracking-widest font-bold">
+                    CONSTRAINT ENGINEERING
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                    Built for Problems That Aren&apos;t Simple
+                  </h2>
+                  <p className="font-body-md text-body-md text-text-muted">
+                    Standard benchmarks assume limitless clusters and clean labels. Our engine handles asymmetric clinical reality, scarce annotations, and hard local VRAM limits.
                   </p>
                 </div>
 
-                {/* Tech Badges */}
-                <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-cyan-500/30 text-slate-200 font-label-code text-[11px] font-semibold">Next.js 16 (App Router)</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-cyan-500/30 text-slate-200 font-label-code text-[11px] font-semibold">Tailwind CSS v4</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-cyan-950/80 border border-cyan-400/50 text-cyan-200 font-label-code text-[11px] font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]">Gemini RAG Synthesis</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-400/50 text-indigo-200 font-label-code text-[11px] font-bold shadow-[0_0_8px_rgba(99,102,241,0.3)]">Pinecone Vector DB</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 font-label-code text-[11px] font-semibold">NextAuth.js</span>
-                </div>
+                <div className="bg-surface-container-low rounded-xl p-space-lg shadow-lg flex flex-col gap-space-md border border-border-dim">
+                  <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm pb-space-xs border-b border-border-dim/40">
+                    <span className="text-text-primary uppercase font-bold">USER CONSTRAINT PROFILE</span>
+                    <span className="text-tertiary font-bold">ALL CONSTRAINTS RESOLVED</span>
+                  </div>
+                  <div className="flex flex-col gap-space-sm font-label-mono-sm text-label-mono-sm">
+                    <div className="bg-void-surface p-space-sm rounded flex items-center justify-between border border-border-dim/40">
+                      <div className="flex flex-col">
+                        <span className="text-text-muted text-[10px]">SCIENTIFIC BOTTLENECK</span>
+                        <span className="text-text-primary font-bold">Labeled Scans &lt; 400</span>
+                      </div>
+                      <span className="material-symbols-outlined text-tertiary text-[18px]">check_circle</span>
+                      <div className="text-right">
+                        <span className="text-text-muted text-[10px]">AUTOMATED STRATEGY</span>
+                        <span className="text-cyan-radiant font-bold">Self-Supervised Pretraining + CutMix</span>
+                      </div>
+                    </div>
 
-                {/* Social Links */}
-                <div className="flex items-center gap-3 pt-3">
-                  <a
-                    className="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 text-white font-label-code text-[12px] font-bold transition-all flex items-center gap-2 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
-                    href="https://github.com/f25605121-maker/AI-Dataset-Explorer"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">code</span>
-                    <span>GitHub Repository</span>
-                  </a>
-                  <a
-                    className="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-indigo-500/40 hover:border-indigo-400 text-white font-label-code text-[12px] font-bold transition-all flex items-center gap-2 shadow-[0_0_12px_rgba(99,102,241,0.2)]"
-                    href="https://www.linkedin.com/"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">contact_page</span>
-                    <span>LinkedIn Profile</span>
-                  </a>
+                    <div className="bg-void-surface p-space-sm rounded flex items-center justify-between border border-border-dim/40">
+                      <div className="flex flex-col">
+                        <span className="text-text-muted text-[10px]">HARDWARE CEILING</span>
+                        <span className="text-text-primary font-bold">Consumer GPU (≤ 12GB VRAM)</span>
+                      </div>
+                      <span className="material-symbols-outlined text-tertiary text-[18px]">check_circle</span>
+                      <div className="text-right">
+                        <span className="text-text-muted text-[10px]">AUTOMATED STRATEGY</span>
+                        <span className="text-secondary font-bold">Mixed Precision FP16 + Gradient Caching</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-void-surface p-space-sm rounded flex items-center justify-between border border-border-dim/40">
+                      <div className="flex flex-col">
+                        <span className="text-text-muted text-[10px]">EHR MULTIMODAL SKEW</span>
+                        <span className="text-text-primary font-bold">Missing Longitudinal Followups</span>
+                      </div>
+                      <span className="material-symbols-outlined text-tertiary text-[18px]">check_circle</span>
+                      <div className="text-right">
+                        <span className="text-text-muted text-[10px]">AUTOMATED STRATEGY</span>
+                        <span className="text-primary font-bold">Masked Autoencoder Imputation</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-void-surface p-space-sm rounded flex items-center justify-between border border-border-dim/40">
+                      <div className="flex flex-col">
+                        <span className="text-text-muted text-[10px]">ETHICAL &amp; GOVERNANCE</span>
+                        <span className="text-text-primary font-bold">HIPAA / Non-Commercial DUA</span>
+                      </div>
+                      <span className="material-symbols-outlined text-tertiary text-[18px]">check_circle</span>
+                      <div className="text-right">
+                        <span className="text-text-muted text-[10px]">AUTOMATED STRATEGY</span>
+                        <span className="text-tertiary font-bold">Fully Synthesizable Sandbox Split</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-space-sm rounded bg-void-base flex items-center gap-space-sm border border-border-dim/50">
+                    <span className="material-symbols-outlined text-primary text-[20px]">psychology_alt</span>
+                    <span className="font-body-sm text-body-sm text-text-muted">
+                      Solver generated <strong className="text-text-primary">3 feasible hyperparameter schedules</strong> guaranteed to run without memory overflow.
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Architecture Visual Topology Card */}
-              <div className="lg:col-span-5">
-                <div className="rounded-2xl bg-[#0b1222] border border-cyan-500/30 p-5 font-label-code text-[12px] flex flex-col gap-3 shadow-xl">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-700">
-                    <span className="text-cyan-300 font-bold uppercase text-[11px]">Topology Execution Flow</span>
-                    <span className="px-2.5 py-0.5 rounded bg-emerald-500/30 border border-emerald-400/50 text-emerald-300 text-[10px] font-bold shadow-[0_0_8px_rgba(16,185,129,0.3)]">200 OK</span>
+              {/* Right: Don't Just Find a Model. Understand the Trade-offs. */}
+              <div className="xl:col-span-7 flex flex-col gap-space-lg">
+                <div className="flex flex-col gap-space-2xs">
+                  <span className="font-label-mono-sm text-label-mono-sm text-secondary uppercase tracking-widest font-bold">
+                    EMPIRICAL BENCHMARK LAB
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                    Don&apos;t Just Find a Model. Understand the Trade-offs.
+                  </h2>
+                  <p className="font-body-md text-body-md text-text-muted">
+                    The top Kaggle model is rarely the right production model. We rank architectures by resource footprint, inference latency, and data appetite.
+                  </p>
+                </div>
+
+                {/* Benchmark Matrix Table Container */}
+                <div className="bg-surface-container-low rounded-xl overflow-hidden shadow-lg border border-border-dim">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left font-body-sm text-body-sm">
+                      <thead className="bg-surface-container font-label-mono-sm text-label-mono-sm text-text-muted uppercase border-b border-border-dim">
+                        <tr>
+                          <th className="p-space-md">Model Candidate</th>
+                          <th className="p-space-md">Dice Score</th>
+                          <th className="p-space-md">Peak VRAM</th>
+                          <th className="p-space-md">Inference</th>
+                          <th className="p-space-md">Fit Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-dim/40 font-label-mono-sm text-label-mono-sm">
+                        {/* Row 1: Best Fit */}
+                        <tr className="bg-void-surface hover:bg-surface-container transition-colors">
+                          <td className="p-space-md font-bold text-text-primary">
+                            <div className="flex items-center gap-space-xs">
+                              <span className="w-2 h-2 rounded-full bg-cyan-radiant" />
+                              <span>Swin UNETR (3D)</span>
+                            </div>
+                          </td>
+                          <td className="p-space-md text-primary font-bold">0.884</td>
+                          <td className="p-space-md text-tertiary font-bold">9.4 GB</td>
+                          <td className="p-space-md text-text-muted">38ms / scan</td>
+                          <td className="p-space-md">
+                            <span className="px-space-sm py-space-2xs rounded bg-tertiary/20 text-tertiary font-bold">
+                              RECOMMENDED FIT
+                            </span>
+                          </td>
+                        </tr>
+                        {/* Row 2: Heavy SOTA */}
+                        <tr className="bg-void-base hover:bg-surface-container transition-colors">
+                          <td className="p-space-md font-bold text-text-primary">
+                            <div className="flex items-center gap-space-xs">
+                              <span className="w-2 h-2 rounded-full bg-error" />
+                              <span>nnU-Net ResEnc L</span>
+                            </div>
+                          </td>
+                          <td className="p-space-md text-text-primary font-bold">0.897 (+1.3%)</td>
+                          <td className="p-space-md text-error font-bold">22.8 GB (OOM)</td>
+                          <td className="p-space-md text-text-muted">145ms / scan</td>
+                          <td className="p-space-md">
+                            <span className="px-space-sm py-space-2xs rounded bg-error/20 text-error font-bold">
+                              EXCEEDS VRAM
+                            </span>
+                          </td>
+                        </tr>
+                        {/* Row 3: Pure CNN Alternative */}
+                        <tr className="bg-void-surface hover:bg-surface-container transition-colors">
+                          <td className="p-space-md font-bold text-text-primary">
+                            <div className="flex items-center gap-space-xs">
+                              <span className="w-2 h-2 rounded-full bg-secondary" />
+                              <span>3D UX-Net</span>
+                            </div>
+                          </td>
+                          <td className="p-space-md text-secondary font-bold">0.871</td>
+                          <td className="p-space-md text-tertiary font-bold">7.2 GB</td>
+                          <td className="p-space-md text-text-muted">26ms / scan</td>
+                          <td className="p-space-md">
+                            <span className="px-space-sm py-space-2xs rounded bg-surface-container-high text-on-surface-variant font-bold border border-border-dim/60">
+                              VIABLE LIGHTWEIGHT
+                            </span>
+                          </td>
+                        </tr>
+                        {/* Row 4: Classic Baseline */}
+                        <tr className="bg-void-base hover:bg-surface-container transition-colors">
+                          <td className="p-space-md font-bold text-text-primary">
+                            <div className="flex items-center gap-space-xs">
+                              <span className="w-2 h-2 rounded-full bg-text-muted" />
+                              <span>V-Net Residual</span>
+                            </div>
+                          </td>
+                          <td className="p-space-md text-text-muted font-bold">0.832</td>
+                          <td className="p-space-md text-tertiary font-bold">5.1 GB</td>
+                          <td className="p-space-md text-text-muted">14ms / scan</td>
+                          <td className="p-space-md">
+                            <span className="px-space-sm py-space-2xs rounded bg-surface-container-high text-text-muted font-bold border border-border-dim/60">
+                              LOW ACCURACY
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-[#070b15] border border-cyan-500/20 flex items-center justify-between">
-                    <span className="text-slate-300 font-medium">01. Query Ingestion</span>
-                    <span className="text-cyan-300 font-bold">User Intent Vector</span>
-                  </div>
-                  <div className="flex justify-center -my-1 text-cyan-400">
-                    <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-[#070b15] border border-indigo-500/20 flex items-center justify-between">
-                    <span className="text-slate-300 font-medium">02. Semantic Retrieval</span>
-                    <span className="text-indigo-300 font-bold">1536-dim Index</span>
-                  </div>
-                  <div className="flex justify-center -my-1 text-indigo-400">
-                    <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-[#070b15] border border-emerald-500/20 flex items-center justify-between">
-                    <span className="text-slate-300 font-medium">03. Context Reranking</span>
-                    <span className="text-emerald-300 font-bold">Gemini Synthesis</span>
-                  </div>
-                  <div className="flex justify-center -my-1 text-emerald-400">
-                    <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-cyan-950/40 border border-cyan-400/50 flex items-center justify-between shadow-[0_0_12px_rgba(6,182,212,0.25)]">
-                    <span className="text-cyan-200 font-bold">04. Emitted Output</span>
-                    <span className="text-white font-bold">Matched Sets + Scripts</span>
+                  <div className="p-space-md bg-void-surface flex items-center justify-between font-label-mono-sm text-label-mono-sm border-t border-border-dim">
+                    <span className="text-text-muted font-bold">DECISION ENGINE VERDICT:</span>
+                    <span className="text-primary font-bold">
+                      Swin UNETR captures 98.5% of peak nnU-Net accuracy while staying within your 12GB ceiling.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -746,33 +1561,266 @@ peft_config = LoraConfig(
           </section>
 
           {/* ============================================================ */}
-          {/* FINAL RADIANT CALL TO ACTION                                 */}
+          {/* 6. RESEARCH-TO-IMPLEMENTATION ROADMAP & COMPOSER             */}
           {/* ============================================================ */}
-          <section className="glass-card specular-border rounded-3xl p-8 md:p-14 text-center border border-cyan-400/50 relative overflow-hidden shadow-[0_0_80px_rgba(6,182,212,0.25)]">
-            <div className="max-w-3xl mx-auto flex flex-col items-center">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 font-label-code text-[11px] uppercase tracking-wider mb-4 font-bold shadow-[0_0_16px_rgba(6,182,212,0.35)]">
-                <span className="material-symbols-outlined text-[14px]">rocket</span>
-                Instant Access • Zero Infrastructure Setup
+          <section className="w-full px-grid-margin-desktop py-space-3xl bg-void-base border-y border-border-dim">
+            <div className="max-w-[1600px] mx-auto flex flex-col gap-space-2xl">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+                <div className="flex flex-col gap-space-2xs">
+                  <span className="font-label-mono-sm text-label-mono-sm text-tertiary uppercase tracking-wider font-bold">
+                    EXECUTION GRAPH
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-text-primary">
+                    Research-to-Implementation Roadmap
+                  </h2>
+                </div>
+                <button
+                  className="self-start md:self-auto flex items-center gap-space-xs px-space-md py-space-xs rounded bg-surface-container-high hover:bg-surface-bright text-text-primary font-label-mono text-label-mono transition-colors border border-border-dim shadow-sm"
+                  onClick={handleCopyPipeline}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {copiedScript ? "check" : "code"}
+                  </span>
+                  <span>{copiedScript ? "Copied Script to Clipboard!" : "Export Python / PyTorch Pipeline"}</span>
+                </button>
               </div>
-              <h2 className="font-headline-lg text-3xl sm:text-4xl md:text-5xl font-extrabold text-white">
-                Ready to Build Your Next AI Breakthrough?
-              </h2>
-              <p className="font-body-lead text-slate-200 text-base md:text-lg mt-3 max-w-xl font-normal">
-                Explore thousands of curated datasets, inspect VRAM feasibility, and obtain end-to-end implementation pipelines now.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center gap-4 mt-8 w-full sm:w-auto">
+
+              {/* 8-Step Pipeline Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-primary font-bold">STEP 01</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[18px]">
+                      folder_zip
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Dataset Prep</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    NIfTI affine reorientation to RAS coordinate space with intensity min-max scaling to [0, 1].
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-primary font-bold">
+                    MONAI Spacingd(1.0, 1.0, 1.0)
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-primary font-bold">STEP 02</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[18px]">
+                      auto_fix_high
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Preprocessing</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Brain skull-stripping mask inference via HD-BET + bias field correction with N4ITK.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-primary font-bold">
+                    ANTsPy / N4ITK Pipeline
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-secondary font-bold">STEP 03</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-secondary transition-colors text-[18px]">
+                      scatter_plot
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Embedding</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Windowed 3D patch tokenization (2x2x2) projected into a 768-dimensional latent manifold.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-secondary font-bold">
+                    Shifted-Window Attention
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-secondary font-bold">STEP 04</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-secondary transition-colors text-[18px]">
+                      hub
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Multimodal Fusion</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Cross-attention gate aligning tabular clinical EHR vectors with voxel-level bottleneck tokens.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-secondary font-bold">
+                    CrossAttnGate(Dim=768)
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-tertiary font-bold">STEP 05</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-tertiary transition-colors text-[18px]">
+                      sync
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Training Loop</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Cosine annealing scheduler with warm restarts, mixed-precision FP16, and AdamW.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-tertiary font-bold">
+                    AMP / PyTorch Native
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-tertiary font-bold">STEP 06</span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-tertiary transition-colors text-[18px]">
+                      analytics
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Evaluation</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    5-Fold Stratified Cross-Validation on volumetric Dice, 95% Hausdorff Distance, and AUROC.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-tertiary font-bold">
+                    Stratified Patient Split
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-cyan-radiant font-bold">
+                      STEP 07
+                    </span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-cyan-radiant transition-colors text-[18px]">
+                      military_tech
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">Benchmark</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Direct score validation against MedMNIST 3D &amp; BraTS official evaluation metrics.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-cyan-radiant font-bold">
+                    Automated Score Card
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all border border-border-dim">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-mono-sm text-label-mono-sm text-cyan-radiant font-bold">
+                      STEP 08
+                    </span>
+                    <span className="material-symbols-outlined text-text-muted group-hover:text-cyan-radiant transition-colors text-[18px]">
+                      output
+                    </span>
+                  </div>
+                  <h4 className="font-headline-sm text-[15px] text-text-primary font-bold">ONNX Export</h4>
+                  <p className="font-body-sm text-[12px] text-text-muted">
+                    Quantized FP16 TensorRT export packaged in an inference-ready Docker runtime container.
+                  </p>
+                  <div className="font-label-mono-sm text-[9px] text-cyan-radiant font-bold">
+                    ONNX Ops 17 / TRT
+                  </div>
+                </div>
+              </div>
+
+              {/* 'No Direct Match? We Compose One.' Callout Card */}
+              <div className="bg-gradient-to-r from-void-elevated via-surface-container to-void-elevated rounded-xl p-space-xl shadow-xl flex flex-col lg:flex-row items-center justify-between gap-space-lg border border-border-dim">
+                <div className="flex items-start gap-space-md">
+                  <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary shrink-0 border border-secondary/20">
+                    <span className="material-symbols-outlined text-[28px]">account_tree</span>
+                  </div>
+                  <div className="flex flex-col gap-space-2xs">
+                    <div className="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-secondary font-bold">
+                      <span>DYNAMIC MULTI-DATASET COMPOSER</span>
+                      <span className="px-space-xs py-space-2xs rounded bg-surface-container font-bold text-text-primary border border-border-dim">
+                        ACTIVE ENGINE
+                      </span>
+                    </div>
+                    <h3 className="font-headline-sm text-headline-sm text-text-primary font-bold">
+                      No Direct Match? We Compose One.
+                    </h3>
+                    <p className="font-body-sm text-body-sm text-text-muted max-w-2xl">
+                      If an exact single-source dataset doesn&apos;t satisfy all clinical endpoints, our composer dynamically synthesizes harmonized cross-dataset splits (e.g. OASIS-3 + ADNI-3 + synthetic BraTS masks) with statistical bias alignment.
+                    </p>
+                  </div>
+                </div>
                 <Link
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 hover:from-cyan-300 hover:to-indigo-300 text-[#070b15] font-headline-sm text-[15px] font-bold transition-all shadow-[0_0_35px_rgba(34,211,238,0.6)] active:scale-95"
+                  className="shrink-0 px-space-lg py-space-sm rounded bg-void-surface hover:bg-surface-bright text-secondary font-headline-sm text-[13px] font-bold tracking-wide uppercase transition-colors shadow-md border border-border-dim flex items-center gap-1.5"
                   href="/explore"
                 >
-                  Launch Explore Studio →
+                  <span>Launch Dataset Composer</span>
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* ============================================================ */}
+          {/* 7. CINEMATIC CALL TO ACTION SECTION                          */}
+          {/* ============================================================ */}
+          <section className="w-full px-grid-margin-desktop py-space-3xl bg-void-surface relative overflow-hidden">
+            <div className="absolute -bottom-24 -left-24 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[160px] pointer-events-none" />
+            <div className="absolute -top-24 -right-24 w-[500px] h-[500px] bg-purple-bright/15 rounded-full blur-[160px] pointer-events-none" />
+
+            <div className="max-w-[1200px] mx-auto flex flex-col items-center text-center gap-space-xl relative z-10">
+              <div className="inline-flex items-center gap-space-xs px-space-sm py-space-xs rounded bg-surface-container font-label-mono-sm text-label-mono-sm text-primary border border-border-dim">
+                <span className="w-2 h-2 rounded-full bg-cyan-radiant animate-pulse" />
+                <span className="font-bold">LABORATORY-GRADE HIGH THROUGHPUT INDEX</span>
+              </div>
+
+              <div className="flex flex-col gap-space-sm">
+                <h2 className="font-headline-xl text-headline-xl text-text-primary uppercase tracking-tight max-w-3xl">
+                  Your Next AI Project Starts With a{" "}
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-radiant to-purple-bright">
+                    Better Question
+                  </span>
+                  .
+                </h2>
+                <p className="font-body-lg text-body-lg text-text-muted max-w-2xl mx-auto">
+                  Stop scrolling uncurated repositories. Enter your clinical, robotic, or scientific constraints and let our topological graph synthesize the research ecosystem for you.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-space-md">
+                <Link
+                  className="px-space-2xl py-space-md rounded bg-primary hover:bg-cyan-radiant text-on-primary font-headline-sm text-[15px] font-bold tracking-wide uppercase transition-all shadow-xl hover:shadow-cyan-radiant/25 flex items-center gap-space-sm"
+                  href="/explore"
+                >
+                  <span>Explore Your Problem →</span>
                 </Link>
                 <Link
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-white font-label-code text-[13px] font-semibold transition-all shadow-[0_0_12px_rgba(6,182,212,0.2)]"
-                  href="/roadmap"
+                  className="px-space-xl py-space-md rounded bg-surface-container-high hover:bg-surface-bright text-text-primary font-headline-sm text-[15px] font-bold tracking-wide uppercase transition-colors border border-border-dim"
+                  href="/benchmark"
                 >
-                  View Sample Roadmap
+                  Open Benchmark Lab
                 </Link>
+              </div>
+
+              {/* Live Corpus Telemetry Badges */}
+              <div className="w-full pt-space-xl mt-space-md grid grid-cols-2 md:grid-cols-4 gap-space-md border-t border-border-dim/40">
+                <div className="flex flex-col items-center">
+                  <span className="font-headline-lg text-headline-lg text-primary font-bold">25,400+</span>
+                  <span className="font-label-mono-sm text-label-mono-sm text-text-muted mt-1 uppercase font-semibold">
+                    Curated Datasets
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="font-headline-lg text-headline-lg text-secondary font-bold">46,200+</span>
+                  <span className="font-label-mono-sm text-label-mono-sm text-text-muted mt-1 uppercase font-semibold">
+                    Pretrained Checkpoints
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="font-headline-lg text-headline-lg text-tertiary font-bold">100%</span>
+                  <span className="font-label-mono-sm text-label-mono-sm text-text-muted mt-1 uppercase font-semibold">
+                    Open-Access Verified
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="font-headline-lg text-headline-lg text-cyan-radiant font-bold">42ms</span>
+                  <span className="font-label-mono-sm text-label-mono-sm text-text-muted mt-1 uppercase font-semibold">
+                    Mean Retrieval Latency
+                  </span>
+                </div>
               </div>
             </div>
           </section>
@@ -780,84 +1828,130 @@ peft_config = LoraConfig(
       </main>
 
       {/* ============================================================ */}
-      {/* HIGH-CRAFT DEVELOPER FOOTER                                  */}
+      {/* 8. COMPREHENSIVE PLATFORM FOOTER                             */}
       {/* ============================================================ */}
-      <footer className="mt-auto border-t border-cyan-500/20 bg-[#070c18] relative z-10 text-slate-300 font-body-sm text-sm">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-10 border-b border-slate-800">
-            {/* Col 1 & 2: Platform Info */}
-            <div className="lg:col-span-2 flex flex-col gap-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center bg-[#0d1322] border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.4)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt="Brand Logo"
-                    className="w-full h-full object-contain"
-                    src="/logo-stitch.png"
-                  />
-                </div>
-                <span className="font-headline-sm text-[16px] font-bold text-white">AI Dataset Explorer</span>
+      <footer className="w-full bg-void-surface border-t border-border-dim">
+        <div className="w-full px-grid-margin-desktop py-space-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-xl mb-space-2xl">
+            {/* Col 1: Platform Brand */}
+            <div className="lg:col-span-1 flex flex-col gap-space-sm">
+              <div className="flex items-center gap-space-sm">
+                <span className="font-headline-sm text-headline-sm text-text-primary font-bold">
+                  AI Dataset Explorer
+                </span>
               </div>
-              <p className="text-slate-300 text-xs leading-relaxed max-w-sm font-normal">
-                Next-generation RAG-orchestrated dataset repository and telemetry playground. Seamlessly profile high-dimensional embeddings and discover compute feasibility.
+              <p className="font-body-sm text-body-sm text-text-muted">
+                The frontier corpus retrieval, telemetry benchmark, and synthetic dataset orchestration environment for advanced neural models.
               </p>
-              <div className="flex items-center gap-2 pt-1">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.15)]">
-                  <span className="text-xs text-slate-400 font-label-code">Created by</span>
-                  <a
-                    href="https://www.linkedin.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-indigo-300 hover:text-cyan-200 transition-colors flex items-center gap-1 font-label-code"
-                  >
-                    <span>Hammad Ali Tariq</span>
-                    <span className="material-symbols-outlined text-[13px] text-cyan-400">arrow_outward</span>
-                  </a>
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-2 self-start px-3 py-1 rounded-full bg-slate-900 border border-emerald-500/40 text-[11px] font-label-code text-emerald-300 font-semibold shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                All systems operational
+              <div className="flex items-center gap-space-xs font-label-mono-sm text-label-mono-sm text-tertiary font-bold">
+                <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
+                NODE CLUSTER SYNCED · 99.98% SLA
               </div>
             </div>
 
-            {/* Col 3: Platform Routes */}
-            <div className="flex flex-col gap-2.5">
-              <span className="font-headline-sm text-xs uppercase tracking-wider text-white font-bold">Platform Routes</span>
-              <Link className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="/">Home Overview</Link>
-              <Link className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="/explore">Explore Studio</Link>
-              <Link className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="/benchmark">Benchmark &amp; Compare Lab</Link>
-              <Link className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="/roadmap">Pipeline Roadmap</Link>
-              <Link className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://github.com/f25605121-maker/AI-Dataset-Explorer" target="_blank" rel="noopener noreferrer">Documentation</Link>
+            {/* Col 2: Platform Links */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-mono text-label-mono text-text-primary uppercase tracking-wider font-bold">
+                Platform
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore">
+                  Dataset Engine
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/benchmark">
+                  Matrix Compare
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/roadmap">
+                  Synthetic Pipelines
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore">
+                  Embedding Vectors
+                </Link>
+              </nav>
             </div>
 
-            {/* Col 4: Ecosystem */}
-            <div className="flex flex-col gap-2.5">
-              <span className="font-headline-sm text-xs uppercase tracking-wider text-white font-bold">Live Ecosystem</span>
-              <a className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://www.kaggle.com/datasets" rel="noopener noreferrer" target="_blank">Kaggle Datasets</a>
-              <a className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://huggingface.co/datasets" rel="noopener noreferrer" target="_blank">Hugging Face Hub</a>
-              <a className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://arxiv.org/" rel="noopener noreferrer" target="_blank">arXiv ML Preprints</a>
-              <a className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://paperswithcode.com/" rel="noopener noreferrer" target="_blank">Papers With Code</a>
-              <a className="text-xs text-slate-300 hover:text-cyan-300 transition-colors" href="https://github.com/" rel="noopener noreferrer" target="_blank">GitHub AI Repos</a>
+            {/* Col 3: Corpus & Benchmarks */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-mono text-label-mono text-text-primary uppercase tracking-wider font-bold">
+                Corpus &amp; Benchmarks
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore?q=LLM+Reasoning">
+                  LLM Reasoning Sets
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore?q=Multimodal+Vision+QA">
+                  Multimodal Vision QA
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore?q=Code+Math+Frontier">
+                  Code &amp; Math Frontier
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/benchmark">
+                  Human Preference Evals
+                </Link>
+              </nav>
             </div>
 
-            {/* Col 5: Compute Cluster Telemetry */}
-            <div className="flex flex-col gap-2 font-label-code text-[11px]">
-              <span className="font-headline-sm text-xs uppercase tracking-wider text-white font-bold">Compute Nodes</span>
-              <div className="text-slate-300">Cluster: <span className="text-indigo-300 font-semibold">us-east-rag-04</span></div>
-              <div className="text-slate-300">Latency: <span className="text-emerald-300 font-semibold">18ms p99</span></div>
-              <div className="text-slate-300">Vector Embed: <span className="text-cyan-300 font-semibold">1536-dim Ada</span></div>
-              <div className="text-slate-300">VRAM Buffer: <span className="text-emerald-300 font-semibold">68% Headroom</span></div>
+            {/* Col 4: Engineering & API */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-mono text-label-mono text-text-primary uppercase tracking-wider font-bold">
+                Engineering &amp; API
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <a
+                  className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
+                  href="https://github.com/f25605121-maker/AI-Dataset-Explorer"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  Python SDK
+                </a>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/benchmark">
+                  GraphQL Telemetry
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore">
+                  Parquet Streamers
+                </Link>
+                <a
+                  className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
+                  href="https://huggingface.co"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  Hugging Face Bridge
+                </a>
+              </nav>
+            </div>
+
+            {/* Col 5: Organization */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-mono text-label-mono text-text-primary uppercase tracking-wider font-bold">
+                Organization
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/explore">
+                  Lab Research Papers
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/benchmark">
+                  Safety &amp; Bias Audits
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/login">
+                  Institutional Access
+                </Link>
+                <Link className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="/roadmap">
+                  Security Compliance
+                </Link>
+              </nav>
             </div>
           </div>
 
-          {/* Bottom Legal Row */}
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 font-label-code">
-            <div>© 2026 AI Dataset Explorer. Architected by Hammad Ali Tariq.</div>
-            <div className="flex items-center gap-6">
-              <span className="hover:text-cyan-300 transition-colors cursor-pointer">Privacy Telemetry</span>
-              <span className="hover:text-cyan-300 transition-colors cursor-pointer">API Terms</span>
-              <span className="hover:text-cyan-300 transition-colors cursor-pointer">Security Specs</span>
+          <div className="pt-space-lg border-t border-border-dim flex flex-col md:flex-row items-center justify-between gap-space-md font-label-mono-sm text-label-mono-sm text-text-muted">
+            <div>
+              © 2026 AI Dataset Explorer Inc. Laboratory Instrumentation &amp; High-Performance Compute Infrastructure.
+            </div>
+            <div className="flex items-center gap-space-lg">
+              <span>SHARD: US-WEST-2B</span>
+              <span className="hidden sm:inline">GPU TENSOR POOL: ACTIVE</span>
+              <span className="text-primary font-bold">LATENCY: 42MS</span>
             </div>
           </div>
         </div>
