@@ -21,6 +21,7 @@ import {
 import { DomainTemplate } from '@/types/roadmap';
 import { TRENDING_TEMPLATES } from '@/fixtures/trending-templates';
 import { useSearchProgress } from '@/hooks/useSearchProgress';
+import { addSearchToHistory } from '@/hooks/useRecentSearches';
 
 export interface SearchSessionState {
   query: string;
@@ -321,6 +322,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
       setIsLoading(true);
       setError(null);
       setQuery(trimmed);
+      addSearchToHistory(trimmed, userKey === 'guest' ? null : userKey);
       startProgress();
 
       try {

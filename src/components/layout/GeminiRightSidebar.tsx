@@ -13,6 +13,9 @@ export interface GeminiSidebarProps {
     isOpenMobile?: boolean;
     onCloseMobile?: () => void;
     className?: string;
+    recentSearches?: RecentSearchItem[];
+    onRemoveSearch?: (id: string) => void;
+    onClearAllSearches?: () => void;
 }
 
 export function GeminiSidebar({
@@ -22,9 +25,16 @@ export function GeminiSidebar({
     isOpenMobile = false,
     onCloseMobile,
     className = "",
+    recentSearches: propRecentSearches,
+    onRemoveSearch: propOnRemoveSearch,
+    onClearAllSearches: propOnClearAllSearches,
 }: GeminiSidebarProps) {
     const { data: session } = useSession();
-    const { recentSearches, removeSearch, clearAllSearches } = useRecentSearches();
+    const hookData = useRecentSearches();
+
+    const recentSearches = propRecentSearches ?? hookData.recentSearches;
+    const removeSearch = propOnRemoveSearch ?? hookData.removeSearch;
+    const clearAllSearches = propOnClearAllSearches ?? hookData.clearAllSearches;
 
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);

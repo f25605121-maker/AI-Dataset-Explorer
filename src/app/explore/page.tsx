@@ -101,7 +101,7 @@ function ExploreContent() {
 
     const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const { addSearch } = useRecentSearches();
+    const { recentSearches, addSearch, removeSearch, clearAllSearches } = useRecentSearches();
 
     const latestRequestRef = useRef<string>('');
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -490,6 +490,9 @@ function ExploreContent() {
                 {/* Gemini Left Sidebar */}
                 <GeminiRightSidebar
                     currentQuery={submittedQuery}
+                    recentSearches={recentSearches}
+                    onRemoveSearch={removeSearch}
+                    onClearAllSearches={clearAllSearches}
                     onSelectSearch={(q) => {
                         setSearchInput(q);
                         handleSearch(q);
