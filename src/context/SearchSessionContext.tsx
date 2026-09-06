@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   SearchResultPayload,
   SearchIntent,
@@ -59,12 +60,15 @@ export interface SearchSessionState {
   resetSession: () => void;
 }
 
-const STORAGE_KEYS = {
-  QUERY: 'aide_session_query_v2',
-  RESULTS: 'aide_session_results_v2',
-  PINNED: 'aide_session_pinned_v2',
-  TEMPLATE_ID: 'aide_session_template_id_v2',
-};
+function getStorageKeys(userKey: string) {
+  const prefix = `aide_session_u_${encodeURIComponent(userKey)}`;
+  return {
+    QUERY: `${prefix}_query_v3`,
+    RESULTS: `${prefix}_results_v3`,
+    PINNED: `${prefix}_pinned_v3`,
+    TEMPLATE_ID: `${prefix}_template_id_v3`,
+  };
+}
 
 const defaultTemplate: DomainTemplate = TRENDING_TEMPLATES[0] as any as DomainTemplate;
 
@@ -90,6 +94,18 @@ function normalizePayload(raw: any): SearchResultPayload {
 }
 
 export function SearchSessionProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
+  const userKey = session?.user
+    ? ((session.user as any).id || session.user.email || 'authenticated')
+    : 'guest';
+
+  const userKeyRef = useRef(userKey);
+  userKeyRef.current = userKey;
+
+  const storageKeys = getStorageKeys(userKey);
+  const storageKeysRef = useRef(storageKeys);
+  storageKeysRef.current = storageKeys;
+
   const [query, setQueryState] = useState<string>('');
   const [searchResult, setSearchResultState] = useState<SearchResultPayload | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -108,15 +124,24 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
   const [activeTab, setActiveTab] = useState<'all' | 'datasets' | 'models' | 'papers'>('all');
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
-  // Hydrate from localStorage on client mount
+  // Hydrate from user-scoped localStorage whenever userKey changes (login, logout, switch account)
   useEffect(() => {
+    // Clean up legacy unscoped keys
     try {
-      const savedQuery = localStorage.getItem(STORAGE_KEYS.QUERY);
-      const savedResults = localStorage.getItem(STORAGE_KEYS.RESULTS);
-      const savedPinned = localStorage.getItem(STORAGE_KEYS.PINNED);
-      const savedTemplateId = localStorage.getItem(STORAGE_KEYS.TEMPLATE_ID);
+      localStorage.removeItem('aide_session_query_v2');
+      localStorage.removeItem('aide_session_results_v2');
+      localStorage.removeItem('aide_session_pinned_v2');
+      localStorage.removeItem('aide_session_template_id_v2');
+    } catch {}
 
-      if (savedQuery) setQueryState(savedQuery);
+    const keys = getStorageKeys(userKey);
+    try {
+      const savedQuery = localStorage.getItem(keys.QUERY);
+      const savedResults = localStorage.getItem(keys.RESULTS);
+      const savedPinned = localStorage.getItem(keys.PINNED);
+      const savedTemplateId = localStorage.getItem(keys.TEMPLATE_ID);
+
+      setQueryState(savedQuery || '');
 
       if (savedResults) {
         try {
@@ -124,30 +149,48 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
           const normalized = normalizePayload(parsed);
           setSearchResultState(normalized);
           if (normalized.datasets?.[0]) setSelectedDatasetState(normalized.datasets[0]);
+          else setSelectedDatasetState(null);
           if (normalized.models?.[0]) setSelectedModelState(normalized.models[0]);
-        } catch {}
+          else setSelectedModelState(null);
+        } catch {
+          setSearchResultState(null);
+          setSelectedDatasetState(null);
+          setSelectedModelState(null);
+        }
+      } else {
+        setSearchResultState(null);
+        setSelectedDatasetState(null);
+        setSelectedModelState(null);
       }
 
       if (savedPinned) {
         try {
           const parsed = JSON.parse(savedPinned);
           if (Array.isArray(parsed)) setPinnedAssets(parsed);
-        } catch {}
+          else setPinnedAssets([]);
+        } catch {
+          setPinnedAssets([]);
+        }
+      } else {
+        setPinnedAssets([]);
       }
 
       if (savedTemplateId) {
         const found = TRENDING_TEMPLATES.find((t) => t.id === savedTemplateId);
         if (found) setActiveTemplateState(found as any as DomainTemplate);
+        else setActiveTemplateState(defaultTemplate);
+      } else {
+        setActiveTemplateState(defaultTemplate);
       }
     } catch {}
     setIsHydrated(true);
-  }, []);
+  }, [userKey]);
 
   const setQuery = useCallback((newQuery: string) => {
     setQueryState(newQuery);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEYS.QUERY, newQuery);
+        localStorage.setItem(storageKeysRef.current.QUERY, newQuery);
       } catch {}
     }
   }, []);
@@ -159,10 +202,10 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
     if (typeof window !== 'undefined') {
       if (normalized) {
         try {
-          localStorage.setItem(STORAGE_KEYS.RESULTS, JSON.stringify(normalized));
+          localStorage.setItem(storageKeysRef.current.RESULTS, JSON.stringify(normalized));
         } catch {}
       } else {
-        localStorage.removeItem(STORAGE_KEYS.RESULTS);
+        localStorage.removeItem(storageKeysRef.current.RESULTS);
       }
     }
 
@@ -180,7 +223,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
       setSelectedDatasetState(null);
       setSelectedModelState(null);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEYS.PINNED);
+        localStorage.removeItem(storageKeysRef.current.PINNED);
       }
     } else {
       if (normalized?.datasets?.[0]) {
@@ -219,7 +262,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEYS.PINNED, JSON.stringify(updated));
+          localStorage.setItem(storageKeysRef.current.PINNED, JSON.stringify(updated));
         } catch {}
       }
       return true;
@@ -234,7 +277,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEYS.PINNED, JSON.stringify(updated));
+          localStorage.setItem(storageKeysRef.current.PINNED, JSON.stringify(updated));
         } catch {}
       }
     },
@@ -256,7 +299,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
     setPinnedAssets([]);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem(STORAGE_KEYS.PINNED);
+        localStorage.removeItem(storageKeysRef.current.PINNED);
       } catch {}
     }
   }, []);
@@ -320,8 +363,8 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEYS.TEMPLATE_ID, tpl.id);
-          localStorage.setItem(STORAGE_KEYS.QUERY, tpl.query);
+          localStorage.setItem(storageKeysRef.current.TEMPLATE_ID, tpl.id);
+          localStorage.setItem(storageKeysRef.current.QUERY, tpl.query);
         } catch {}
       }
 
@@ -421,7 +464,7 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
           ];
           if (typeof window !== 'undefined') {
             try {
-              localStorage.setItem(STORAGE_KEYS.PINNED, JSON.stringify(autoPins));
+              localStorage.setItem(storageKeysRef.current.PINNED, JSON.stringify(autoPins));
             } catch {}
           }
           return autoPins;
@@ -444,10 +487,10 @@ export function SearchSessionProvider({ children }: { children: React.ReactNode 
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem(STORAGE_KEYS.QUERY);
-        localStorage.removeItem(STORAGE_KEYS.RESULTS);
-        localStorage.removeItem(STORAGE_KEYS.PINNED);
-        localStorage.removeItem(STORAGE_KEYS.TEMPLATE_ID);
+        localStorage.removeItem(storageKeysRef.current.QUERY);
+        localStorage.removeItem(storageKeysRef.current.RESULTS);
+        localStorage.removeItem(storageKeysRef.current.PINNED);
+        localStorage.removeItem(storageKeysRef.current.TEMPLATE_ID);
       } catch {}
     }
   }, []);

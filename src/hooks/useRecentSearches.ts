@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 
 export interface RecentSearchItem {
     id: string;
@@ -9,128 +10,147 @@ export interface RecentSearchItem {
     category?: string;
 }
 
-const STORAGE_KEY = "aide_recent_searches_v1";
-
-const INITIAL_SEEDS: RecentSearchItem[] = [
-    {
-        id: "seed-1",
-        query: "Real-time AI system for driver drowsiness detection using in-cabin video streams",
-        timestamp: Date.now() - 1000 * 60 * 12, // 12 mins ago
-        category: "Computer Vision",
-    },
-    {
-        id: "seed-2",
-        query: "Coronary artery CT segmentation with 3D U-Net and Dice loss",
-        timestamp: Date.now() - 1000 * 60 * 65, // 1 hour ago
-        category: "Medical Imaging",
-    },
-    {
-        id: "seed-3",
-        query: "Vehicle tracking in CCTV video with DeepSORT and YOLOv8",
-        timestamp: Date.now() - 1000 * 60 * 180, // 3 hours ago
-        category: "Object Detection",
-    },
-    {
-        id: "seed-4",
-        query: "Chest X-ray pneumonia classification with DenseNet-121",
-        timestamp: Date.now() - 1000 * 60 * 60 * 7, // 7 hours ago
-        category: "Medical AI",
-    },
-    {
-        id: "seed-5",
-        query: "Explain backpropagation vs Adam optimizer with learning rate warmup",
-        timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-        category: "Machine Learning",
-    },
-    {
-        id: "seed-6",
-        query: "AI Dataset Explorer Prompt Design and Benchmarking",
-        timestamp: Date.now() - 1000 * 60 * 60 * 30, // 1.2 days ago
-        category: "LLM & IR",
-    },
-    {
-        id: "seed-7",
-        query: "Building an Intelligent Vibe Coder App architecture",
-        timestamp: Date.now() - 1000 * 60 * 60 * 48, // 2 days ago
-        category: "Software AI",
-    },
-    {
-        id: "seed-8",
-        query: "Project Folder Structure Evaluation and Best Practices",
-        timestamp: Date.now() - 1000 * 60 * 60 * 72, // 3 days ago
-        category: "Architecture",
-    },
-];
-
 export function useRecentSearches() {
+    const { data: session, status } = useSession();
     const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
     const [isHydrated, setIsHydrated] = useState(false);
 
-    // Hydrate from localStorage on client mount
+    // Derive a unique storage key scoped strictly to the current user account
+    const userId = session?.user
+        ? ((session.user as any).id || session.user.email || 'authenticated')
+        : null;
+
+    const storageKey = userId
+        ? `aide_recent_searches_user_${encodeURIComponent(userId)}`
+        : 'aide_recent_searches_guest';
+
+    const currentKeyRef = useRef(storageKey);
+    currentKeyRef.current = storageKey;
+
+    // Hydrate & switch history whenever user session changes (login, logout, account switch)
     useEffect(() => {
+        // Clean up legacy unscoped shared storage key to prevent cross-account leakage
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
+            localStorage.removeItem("aide_recent_searches_v1");
+        } catch {}
+
+        // 1. Immediately reset state and load cached history for THIS specific account
+        try {
+            const cached = localStorage.getItem(storageKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
                     setRecentSearches(parsed);
-                    setIsHydrated(true);
-                    return;
+                } else {
+                    setRecentSearches([]);
                 }
+            } else {
+                setRecentSearches([]);
             }
-            // If empty or never set, populate with initial seeds
-            setRecentSearches(INITIAL_SEEDS);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SEEDS));
         } catch {
-            setRecentSearches(INITIAL_SEEDS);
+            setRecentSearches([]);
         }
         setIsHydrated(true);
-    }, []);
 
-    // Add a new search query
-    const addSearch = useCallback((query: string, category?: string) => {
-        const trimmed = query.trim();
-        if (!trimmed) return;
+        // 2. If authenticated, fetch the fresh user-scoped history from the server
+        if (userId && status === "authenticated") {
+            const activeKey = storageKey;
+            fetch("/api/user/history")
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                    // Avoid race condition if user switched accounts while request was in-flight
+                    if (currentKeyRef.current !== activeKey) return;
 
-        setRecentSearches((prev) => {
-            // Remove duplicate query if present
-            const filtered = prev.filter(
-                (item) => item.query.toLowerCase() !== trimmed.toLowerCase()
-            );
+                    if (data?.success && Array.isArray(data.history)) {
+                        setRecentSearches(data.history);
+                        try {
+                            localStorage.setItem(activeKey, JSON.stringify(data.history));
+                        } catch {}
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [storageKey, userId, status]);
 
-            const newItem: RecentSearchItem = {
-                id: `search-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                query: trimmed,
-                timestamp: Date.now(),
-                category,
-            };
+    // Add a new search query to this user's history
+    const addSearch = useCallback(
+        (query: string, category?: string) => {
+            const trimmed = query.trim();
+            if (!trimmed) return;
 
-            const updated = [newItem, ...filtered].slice(0, 40); // keep up to 40
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            } catch {}
-            return updated;
-        });
-    }, []);
+            const activeKey = currentKeyRef.current;
+
+            setRecentSearches((prev) => {
+                // Deduplicate query
+                const filtered = prev.filter(
+                    (item) => item.query.toLowerCase() !== trimmed.toLowerCase()
+                );
+
+                const newItem: RecentSearchItem = {
+                    id: `search-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    query: trimmed,
+                    timestamp: Date.now(),
+                    category,
+                };
+
+                const updated = [newItem, ...filtered].slice(0, 40);
+                try {
+                    localStorage.setItem(activeKey, JSON.stringify(updated));
+                } catch {}
+                return updated;
+            });
+
+            // If authenticated, persist to server-side user store
+            if (userId) {
+                fetch("/api/user/history", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: trimmed, category }),
+                }).catch(() => {});
+            }
+        },
+        [userId]
+    );
 
     // Remove single search item
-    const removeSearch = useCallback((id: string) => {
-        setRecentSearches((prev) => {
-            const updated = prev.filter((item) => item.id !== id);
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            } catch {}
-            return updated;
-        });
-    }, []);
+    const removeSearch = useCallback(
+        (id: string) => {
+            const activeKey = currentKeyRef.current;
 
-    // Clear all searches
+            setRecentSearches((prev) => {
+                const updated = prev.filter((item) => item.id !== id);
+                try {
+                    localStorage.setItem(activeKey, JSON.stringify(updated));
+                } catch {}
+                return updated;
+            });
+
+            // If authenticated, remove from server
+            if (userId) {
+                fetch(`/api/user/history?id=${encodeURIComponent(id)}`, {
+                    method: "DELETE",
+                }).catch(() => {});
+            }
+        },
+        [userId]
+    );
+
+    // Clear all searches for this user
     const clearAllSearches = useCallback(() => {
+        const activeKey = currentKeyRef.current;
+
         setRecentSearches([]);
         try {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(activeKey);
         } catch {}
-    }, []);
+
+        // If authenticated, clear all on server
+        if (userId) {
+            fetch("/api/user/history?all=true", {
+                method: "DELETE",
+            }).catch(() => {});
+        }
+    }, [userId]);
 
     return {
         recentSearches,

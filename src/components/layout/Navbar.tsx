@@ -40,6 +40,18 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
+  const handleSignOut = async () => {
+    setProfileMenuOpen(false);
+    setMobileMenuOpen(false);
+    try {
+      localStorage.removeItem("aide_recent_searches_guest");
+      localStorage.removeItem("aide_session_u_guest_query_v3");
+      localStorage.removeItem("aide_session_u_guest_results_v3");
+      localStorage.removeItem("aide_session_u_guest_pinned_v3");
+    } catch {}
+    await signOut({ callbackUrl: "/" });
+  };
+
   const userInitial = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "U";
   const userName = session?.user?.name || session?.user?.email || "User";
   const userEmail = session?.user?.email || "";
@@ -215,10 +227,7 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
                     </div>
                     <div className="pt-1 border-t border-subtle">
                       <button
-                        onClick={() => {
-                          setProfileMenuOpen(false);
-                          signOut({ callbackUrl: "/" });
-                        }}
+                        onClick={handleSignOut}
                         className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition"
                       >
                         <span>🚪</span>
@@ -304,10 +313,7 @@ export function Navbar({ className = "", variant = "app", onToggleSidebar, isSid
                   <span className="text-[11px] text-muted truncate">{userEmail}</span>
                 </div>
                 <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    signOut({ callbackUrl: "/" });
-                  }}
+                  onClick={handleSignOut}
                   className="px-3 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
                 >
                   Sign Out
