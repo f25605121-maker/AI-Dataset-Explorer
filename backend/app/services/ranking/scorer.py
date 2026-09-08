@@ -4,6 +4,7 @@ from backend.app.schemas.dataset import DatasetRecommendation, DatasetScoreBreak
 from backend.app.schemas.model import ModelRecommendation, ModelScoreBreakdown
 from backend.app.schemas.paper import PaperRecommendation, PaperScoreBreakdown
 from backend.app.core.config import settings
+from backend.app.services.ranking.relevance import alignment_score, evaluate_alignment
 
 
 class CompositeScorer:
@@ -33,7 +34,9 @@ class CompositeScorer:
         req_mods = [m.lower() for m in profile.modalities]
 
         for cand, raw_score in candidates:
-            # 1. Semantic component (0-100)
+            alignment = evaluate_alignment(cand, profile)
+            dimensions = alignment["dimensions"]
+            # Semantic similarity is evidence, but cannot compensate for scientific incompatibility.
             semantic_score = min(100.0, raw_score * 100.0)
 
             # 2. Task & Domain component
@@ -59,7 +62,7 @@ class CompositeScorer:
             req_subdomains = [s.lower() for s in (profile.subdomains or [])]
             subdomain_boost = 10.0 if any(rs in c_subdomains or any(cs in rs for cs in c_subdomains) for rs in req_subdomains) else 0.0
 
-            domain_score = min(100.0, (task_match * 0.35 + mod_match * 0.35 + dom_match * 0.30) + subdomain_boost)
+            domain_score = min(100.0, alignment_score(alignment))
 
             # 3. Constraint compatibility
             constraint_score = 95.0
@@ -88,7 +91,9 @@ class CompositeScorer:
                 settings.FRESHNESS_WEIGHT * 80.0 +
                 settings.POPULARITY_WEIGHT * 80.0
             )
-            final_score = int(round(max(20.0, min(99.0, composite))))
+            final_score = int(round(max(0.0, min(99.0, composite))))
+            if alignment["incompatibilities"] and not alignment["transfer_learning"]:
+                final_score = min(final_score, 44)
             match_level = self._get_match_level(final_score)
 
             # Formulate structured evidence "Why this result?"
@@ -97,6 +102,10 @@ class CompositeScorer:
                 why.append(f"Direct match for requested task: {req_tasks[0]}")
             if any(rm in c_mods for rm in req_mods):
                 why.append(f"Supports target data modality: {profile.modalities[0]}")
+            if alignment["incompatibilities"]:
+                warnings.append("Scientific mismatch: " + ", ".join(alignment["incompatibilities"]))
+            if alignment["transfer_learning"] and alignment["incompatibilities"]:
+                match_level = "PARTIAL"
             why.append("Documented and verified open research dataset")
             if connected_papers:
                 why.append(f"Linked to {len(connected_papers)} peer-reviewed scientific publications")
@@ -104,8 +113,8 @@ class CompositeScorer:
             breakdown = DatasetScoreBreakdown(
                 semantic=round(semantic_score, 1),
                 task=round(task_match, 1),
-                domain=round(domain_score, 1),
-                modality=round(mod_match, 1),
+                domain=round(dimensions["domain"], 1),
+                modality=round(dimensions["modality"], 1),
                 constraints=round(constraint_score, 1),
                 research=round(research_score, 1),
                 benchmark=round(benchmark_score, 1),
@@ -131,6 +140,10 @@ class CompositeScorer:
                 score_breakdown=breakdown,
                 why=why,
                 warnings=warnings,
+                evidence=[
+                    {"dimension": dimension, "score": round(value, 1)}
+                    for dimension, value in dimensions.items()
+                ],
                 strengths=["High citation benchmark", "Standard evaluation split available"],
                 limitations=["Ensure institutional ethics approval for clinical deployment"] if "Healthcare" in str(profile.domains) else [],
                 connected_papers=connected_papers,
@@ -150,10 +163,12 @@ class CompositeScorer:
         req_tasks = [t.name.lower() for t in profile.tasks]
 
         for cand, raw_score in candidates:
+            alignment = evaluate_alignment(cand, profile)
+            dimensions = alignment["dimensions"]
             semantic_score = min(100.0, raw_score * 100.0)
 
             c_tasks = [t.lower() for t in cand.get("tasks", [])]
-            task_score = 95.0 if any(rt in c_tasks or any(ct in rt for ct in c_tasks) for rt in req_tasks) else 75.0
+            task_score = dimensions["task"]
 
             # Compute feasibility
             mem_info = cand.get("memory_requirement") or {}
@@ -177,8 +192,12 @@ class CompositeScorer:
                 settings.FRESHNESS_WEIGHT * 80.0 +
                 settings.POPULARITY_WEIGHT * 80.0
             )
-            final_score = int(round(max(20.0, min(99.0, composite))))
+            final_score = int(round(max(0.0, min(99.0, composite))))
+            if alignment["incompatibilities"] and not alignment["transfer_learning"]:
+                final_score = min(final_score, 44)
             match_level = self._get_match_level(final_score)
+            if alignment["transfer_learning"] and alignment["incompatibilities"]:
+                match_level = "PARTIAL"
 
             why: List[str] = [
                 f"Architecture compatible with {profile.tasks[0].name if profile.tasks else 'task'}",
@@ -189,8 +208,8 @@ class CompositeScorer:
             breakdown = ModelScoreBreakdown(
                 semantic=round(semantic_score, 1),
                 task=round(task_score, 1),
-                domain=85.0,
-                modality=90.0,
+                domain=round(dimensions["domain"], 1),
+                modality=round(dimensions["modality"], 1),
                 compute_compatibility=round(compute_score, 1),
                 benchmark_evidence=85.0,
                 research_support=85.0,
@@ -234,6 +253,8 @@ class CompositeScorer:
         min_year = profile.research_constraints.minimum_year
 
         for cand, raw_score in candidates:
+            alignment = evaluate_alignment(cand, profile)
+            dimensions = alignment["dimensions"]
             year = cand.get("year") or 2024
             freshness_score = 95.0 if year >= 2024 else 85.0 if year >= 2022 else 70.0
 
@@ -251,31 +272,15 @@ class CompositeScorer:
             elif year >= 2024:
                 p_type = "LATEST_RESEARCH"
 
-            # Topic & Subdomain alignment
-            title_text = f"{cand.get('title', '')} {cand.get('abstract', '')}".lower()
-            p_domains = [d.lower() for d in cand.get("domains", [])]
-            req_domains = [d.lower() for d in (profile.domains or [])]
-            req_subdomains = [s.lower() for s in (profile.subdomains or [])]
-            req_keywords = [k.lower() for k in (profile.keywords or [])]
-
-            domain_match = 1.0
-            if req_domains and p_domains:
-                domain_match = 1.0 if any(rd in pd or pd in rd for rd in req_domains for pd in p_domains) else 0.3
-
-            topic_boost = 0.0
-            if any(rs in title_text for rs in req_subdomains):
-                topic_boost += 20.0
-            if any(k in title_text for k in req_keywords[:5]):
-                topic_boost += 15.0
-
-            # Penalize mismatched disease topics
-            mismatched_diseases = ["skin lesion", "melanoma", "dermoscopy", "fluorescence", "nuclei", "abdominal"]
-            if any(term in rs for term in ["neurology", "neurodegenerative", "alzheimer"] for rs in req_subdomains):
-                if any(md in title_text for md in mismatched_diseases):
-                    topic_boost -= 40.0
-
-            composite = (raw_score * 50.0) + (freshness_score * 0.25) + (domain_match * 25.0) + topic_boost
-            final_score = int(round(max(20.0, min(99.0, composite))))
+            # Papers are primarily ranked by direct scientific alignment, with freshness as a tie-breaker.
+            direct_relevance = alignment_score(alignment)
+            composite = (direct_relevance * 0.65) + (raw_score * 100.0 * 0.15) + (freshness_score * 0.20)
+            final_score = int(round(max(0.0, min(99.0, composite))))
+            if alignment["incompatibilities"] and not alignment["transfer_learning"]:
+                final_score = min(final_score, 44)
+            paper_match_level = "PARTIAL" if alignment["transfer_learning"] and alignment["incompatibilities"] else (
+                "WEAK" if alignment["incompatibilities"] else "DIRECT"
+            )
 
             why: List[str] = [
                 f"Addresses {profile.tasks[0].name if profile.tasks else 'target methodology'}",
@@ -283,6 +288,8 @@ class CompositeScorer:
             ]
             if p_type == "DATASET_SPECIFIC":
                 why.append("Directly validates and benchmarks recommended dataset")
+            if alignment["incompatibilities"]:
+                why.append("Partial or incompatible evidence: " + ", ".join(alignment["incompatibilities"]))
 
             recs.append(PaperRecommendation(
                 id=cand.get("id", ""),
@@ -300,10 +307,16 @@ class CompositeScorer:
                 citation_count=cand.get("citation_count", 0),
                 score=final_score,
                 paper_type=p_type,
+                match_level=paper_match_level,
                 why=why,
                 score_breakdown=PaperScoreBreakdown(
-                    task_relevance=88.0,
-                    methodological_relevance=85.0,
+                    task_relevance=round(dimensions["task"], 1),
+                    domain_relevance=round(dimensions["domain"], 1),
+                    modality_relevance=round(dimensions["modality"], 1),
+                    disease_relevance=round(dimensions["disease"], 1),
+                    population_relevance=round(dimensions["population"], 1),
+                    longitudinal_relevance=round(dimensions["longitudinal"], 1),
+                    methodological_relevance=round(dimensions["task"], 1),
                     dataset_relevance=95.0 if p_type == "DATASET_SPECIFIC" else 70.0,
                     model_relevance=95.0 if p_type == "MODEL_SPECIFIC" else 70.0,
                     freshness=freshness_score,

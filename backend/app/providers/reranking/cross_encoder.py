@@ -37,18 +37,21 @@ class CrossEncoderReranker(RerankerProvider):
             if any(term in title.lower() for term in query_terms):
                 title_score = 0.20
 
-            # Disease / Core entity alignment
+            # Disease / core entity alignment. A missing disease is not equivalent to a match.
             disease_keywords = ["alzheimer", "dementia", "glioma", "melanoma", "pneumonia", "nuclei", "lesion", "covid", "retinopathy"]
             query_diseases = [d for d in disease_keywords if d in query.lower()]
             if query_diseases:
-                topic_bonus = 0.35 if any(qd in text for qd in query_diseases) else -0.20
+                topic_bonus = 0.35 if any(qd in text for qd in query_diseases) else -0.35
             else:
                 topic_bonus = 0.0
+
+            required_modalities = [m for m in ("mri", "ct", "x-ray", "microscopy", "tabular", "text", "audio") if m in query.lower()]
+            modality_penalty = -0.30 if required_modalities and not any(modality in text for modality in required_modalities) else 0.0
 
             # 3. Base retrieval rank bonus
             base_score = cand.get("initial_score", 0.6) * 0.25
 
-            total_score = round(max(0.1, min(1.0, overlap_score + title_score + topic_bonus + base_score + 0.20)), 4)
+            total_score = round(max(0.1, min(1.0, overlap_score + title_score + topic_bonus + modality_penalty + base_score + 0.20)), 4)
             scored.append((cand, total_score))
 
         scored.sort(key=lambda x: x[1], reverse=True)

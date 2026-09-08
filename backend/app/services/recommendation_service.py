@@ -99,9 +99,10 @@ class RecommendationPipelineService:
         )
 
         # ── STAGE 7: Re-ranking ────────────────────────────────────────────────
-        ds_reranked = await self.reranker.rerank(query, [d for d, _ in ds_linked], top_k=10)
-        mdl_reranked = await self.reranker.rerank(query, [m for m, _ in mdl_linked], top_k=10)
-        ppr_reranked = await self.reranker.rerank(query, [p for p, _ in ppr_linked], top_k=15)
+        rerank_query = self._build_rerank_query(query, profile)
+        ds_reranked = await self.reranker.rerank(rerank_query, [d for d, _ in ds_linked], top_k=10)
+        mdl_reranked = await self.reranker.rerank(rerank_query, [m for m, _ in mdl_linked], top_k=10)
+        ppr_reranked = await self.reranker.rerank(rerank_query, [p for p, _ in ppr_linked], top_k=15)
 
         # ── STAGE 8: Multi-Factor Scoring & Explanations ────────────────────────
         ranked_datasets = self.scorer.score_datasets(ds_reranked, profile)
@@ -200,6 +201,18 @@ class RecommendationPipelineService:
             closest_alternatives=closest_alternatives,
             difference_explanation=difference_explanation,
         )
+
+    def _build_rerank_query(self, query: str, profile: ProblemProfile) -> str:
+        """Make the cross-encoder compare scientific dimensions, not generic modality words."""
+        dimensions = [
+            f"tasks: {', '.join(task.name for task in profile.tasks)}",
+            f"domains: {', '.join(profile.domains + profile.subdomains)}",
+            f"modalities: {', '.join(profile.modalities)}",
+            f"population: {', '.join(profile.population)}",
+        ]
+        if profile.longitudinal:
+            dimensions.append("longitudinal follow-up required")
+        return f"{query} | {'; '.join(dimensions)}"
 
     def _dataset_to_dict(self, d: Dataset) -> Dict[str, Any]:
         return {

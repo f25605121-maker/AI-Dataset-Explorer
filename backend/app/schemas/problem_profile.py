@@ -79,6 +79,8 @@ class ProblemProfile(BaseModel):
     subproblems: List[SubproblemItem] = Field(default_factory=list)
     domains: List[str] = Field(default_factory=list)
     subdomains: List[str] = Field(default_factory=list)
+    population: List[str] = Field(default_factory=list)
+    longitudinal: bool = False
     input: InputSpec = Field(default_factory=InputSpec)
     output: OutputSpec = Field(default_factory=OutputSpec)
     modalities: List[str] = Field(default_factory=list)

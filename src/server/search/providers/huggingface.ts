@@ -13,7 +13,7 @@ const HF_DATASETS_API = 'https://huggingface.co/api/datasets';
 const HF_MODELS_API = 'https://huggingface.co/api/models';
 
 function getHfHeaders(): Record<string, string> {
-    const token = process.env.HUGGINGFACE_TOKEN || process.env.HF_API_KEY || process.env.HF_TOKEN;
+    const token = process.env.HUGGING_FACE_TOKEN || process.env.HUGGINGFACE_TOKEN || process.env.HF_API_KEY || process.env.HF_TOKEN;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;

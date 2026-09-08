@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hybrid Retrieval & Dynamic Query-Adaptive Scoring Engine (Search Engine 2.0.0)
  *
  * Implements Section 10, 11, 23:
@@ -10,14 +10,14 @@
  * 6. Match breakdown and transparent explanation generator
  *
  * COMPOSITE SCORING FORMULA (Standardized 4-Factor):
- *   FinalScore = (w_m · S_modality) + (w_t · S_task) + (w_d · S_domain) + (w_s · S_semantic)
+ *   FinalScore = (w_m Â· S_modality) + (w_t Â· S_task) + (w_d Â· S_domain) + (w_s Â· S_semantic)
  *   w_m=0.35, w_t=0.30, w_d=0.20, w_s=0.15
  *
  * ZERO-MULTIPLIER RULE:
- *   If S_modality = 0 → FinalScore = 0. Modality gate output feeds directly into this formula.
+ *   If S_modality = 0 â†’ FinalScore = 0. Modality gate output feeds directly into this formula.
  *
  * CONFIDENCE THRESHOLDING:
- *   If max(FinalScore) across result set < 60 → status = 'PARTIAL_OR_LOW_CONFIDENCE'.
+ *   If max(FinalScore) across result set < 60 â†’ status = 'PARTIAL_OR_LOW_CONFIDENCE'.
  *   No candidate may be badged "Top Match" or assigned ">80% Compatible" in this state.
  */
 
@@ -34,8 +34,11 @@ import { evaluateCandidateCrossEncoder } from './crossEncoder';
 import { verifyCandidateEvidence } from './evidenceVerifier';
 import { checkModalityCompatibility } from './modalityCompatibilityMatrix';
 import { getTaskAlignmentScore, classifyCandidateTask, classifyTask } from './taskAlignmentMatrix';
+import { getRequirementProfile } from './requirementExtractor';
+import { matchCandidateRequirements, computeRequirementCoverage, computeHardConstraintScore } from './requirementMatcher';
+import { calibrateScore, categorizeRequirements } from './confidenceCalibrator';
 
-/** Confidence status for a result set — evaluated after all candidates are scored. */
+/** Confidence status for a result set â€” evaluated after all candidates are scored. */
 export type ConfidenceStatus = 'HIGH_CONFIDENCE' | 'PARTIAL_OR_LOW_CONFIDENCE';
 
 /** Minimum FinalScore for any candidate to be considered high-confidence. */
@@ -289,16 +292,16 @@ export function scoreCandidate(
     const citations = candidate.citationCount || 0;
     const popularityScore = Math.min(100, downloads > 10000 || likes > 500 || citations > 200 ? 100 : downloads > 1000 || citations > 20 ? 60 : 30);
 
-    // ── STANDARDIZED 4-FACTOR COMPOSITE FORMULA ────────────────────────────────
+    // â”€â”€ STANDARDIZED 4-FACTOR COMPOSITE FORMULA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //
-    //   FinalScore = (w_m · S_modality) + (w_t · S_task) + (w_d · S_domain) + (w_s · S_semantic)
+    //   FinalScore = (w_m Â· S_modality) + (w_t Â· S_task) + (w_d Â· S_domain) + (w_s Â· S_semantic)
     //   w_m=0.35, w_t=0.30, w_d=0.20, w_s=0.15
     //
     // For medical/biomedical queries, S_domain incorporates anatomy + technique + dimension.
     // For non-medical queries, S_domain = domainScore.
     //
     // ZERO-MULTIPLIER RULE:
-    //   Check the universal modality gate. If S_modality = 0 → FinalScore = 0 immediately.
+    //   Check the universal modality gate. If S_modality = 0 â†’ FinalScore = 0 immediately.
     //   This prevents any semantic or keyword score from compensating for wrong data types.
 
     const rawQueryText = isSchema ? (input as ResearchQuerySchema).originalQuery : (input as StructuredQueryUnderstanding).rawQuery;
@@ -382,10 +385,10 @@ export function scoreCandidate(
         confirmedClaims: verified.confirmedClaims,
         warnings: [
             ...verified.warnings,
-            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query — score forced to 0'] : []),
+            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query â€” score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],
-        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility — cannot score'] : undefined,
+        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility â€” cannot score'] : undefined,
     };
 
     // Calculate Evidence Confidence (Dual-metric: Match Score vs Evidence Confidence)
@@ -397,7 +400,7 @@ export function scoreCandidate(
         ? 0  // Zero evidence confidence for modality-killed candidates
         : Math.max(15, Math.min(99, Math.round(baseConfidence * 0.7 + docLengthFactor * 20 + (verified.evidenceItems.length * 3))));
 
-    // Match Category & Quality Tier — based on standardized FinalScore
+    // Match Category & Quality Tier â€” based on standardized FinalScore
     let matchCategory: 'EXACT_MATCH' | 'PARTIAL_MATCH' | 'RELATED_RESOURCE' = 'RELATED_RESOURCE';
     let tier = 'Tier D';
 
@@ -443,6 +446,7 @@ export function scoreCandidate(
         if (techniqueScore >= 75) {
             whyMatches.push(`Specialized technique and model pipeline alignment verified`);
         }
+
         if (semanticScore >= 75) {
             whyMatches.push(`High semantic alignment with ${targetName}`);
         }
@@ -475,18 +479,71 @@ export function scoreCandidate(
         : matchCategory === 'EXACT_MATCH'
         ? `Verified exact match: ${title} directly matches ${cleanTarget} criteria.`
         : matchCategory === 'PARTIAL_MATCH'
-        ? `Partial match: ${title} provides foundational ${modalityName !== 'Multimodal / General' ? modalityName + ' ' : ''}resources with partial alignment to ${cleanTarget}.`
+        ? `Partial match: ${title} provides foundational resources with partial alignment to ${cleanTarget}.`
         : `Related scientific resource: ${title} for ${domainName} exploration.`;
-
 
     const candidateModality = Array.isArray(candidate.modality)
         ? candidate.modality
         : (candidate.modality ? [candidate.modality] : []);
 
+    // ── REQUIREMENT-AWARE CALIBRATION ────────────────────────────────────────
+    // Extracts requirements from query, matches candidate, applies caps.
+    // This replaces finalScore with a requirement-coverage-dominant score.
+    const requirementProfile = getRequirementProfile(rawQueryText);
+    let calibratedFinalScore = finalScore;
+    let reqMatchLevel: string | null = null;
+    let reqMatches: any[] = [];
+    let reqCoverage = 50;
+    let hardConstraintScore = 100;
+    let technicalCompatibility = 75;
+    let matchLevelExplanation = '';
+    let scoringTrace: any = null;
+    let satisfiedReqs: string[] = [];
+    let missingReqs: string[] = [];
+    let unknownReqs: string[] = [];
+    let conflictingReqs: string[] = [];
+
+    if (requirementProfile.requirements.length > 0 && !modalityZeroKill) {
+        reqMatches = matchCandidateRequirements(candidate as UnifiedCandidate, requirementProfile);
+        const calibrated = calibrateScore(finalScore, evidenceConfidence, candidate as UnifiedCandidate, reqMatches, requirementProfile);
+        calibratedFinalScore = calibrated.finalScore;
+        reqMatchLevel = calibrated.matchLevel;
+        reqCoverage = calibrated.requirementCoverage;
+        hardConstraintScore = calibrated.hardConstraintScore;
+        technicalCompatibility = calibrated.technicalCompatibility;
+        matchLevelExplanation = calibrated.matchLevelExplanation;
+        scoringTrace = calibrated.scoringTrace;
+
+        const cats = categorizeRequirements(reqMatches, requirementProfile);
+        satisfiedReqs = cats.satisfied;
+        missingReqs = cats.missing;
+        unknownReqs = cats.unknown;
+        conflictingReqs = cats.conflicting;
+
+        // Update matchBreakdown overall with calibrated score
+        matchBreakdown.overall = calibratedFinalScore;
+
+        // Update matchCategory based on new matchLevel
+        if (reqMatchLevel === 'DIRECT_MATCH' || reqMatchLevel === 'STRONG_MATCH') {
+            matchCategory = calibratedFinalScore >= 80 ? 'EXACT_MATCH' : 'PARTIAL_MATCH';
+        } else if (reqMatchLevel === 'NO_MATCH' || reqMatchLevel === 'WEAK_MATCH') {
+            matchCategory = 'RELATED_RESOURCE';
+        } else {
+            matchCategory = 'PARTIAL_MATCH';
+        }
+
+        // Update tier
+        if (calibratedFinalScore >= 80) tier = evidenceConfidence >= 75 ? 'Tier A' : 'Tier B';
+        else if (calibratedFinalScore >= 70) tier = 'Tier B';
+        else if (calibratedFinalScore >= 50) tier = 'Tier C';
+        else tier = 'Tier D';
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const ranked: RankedResult = {
         ...candidate,
         modality: candidateModality,
-        matchScore: finalScore,
+        matchScore: calibratedFinalScore,
         evidenceConfidence,
         tier,
         evidenceLevel: verified.evidenceLevel,
@@ -499,12 +556,26 @@ export function scoreCandidate(
         matchBreakdown,
         evidenceItems: verified.evidenceItems,
         warnings: verified.warnings,
-        matchReason,
+        matchReason: matchLevelExplanation || matchReason,
         isPretrainedCheckpointVerified: (candidate as any).isPretrainedCheckpointVerified,
         checkpointStatusLabel: (candidate as any).checkpointStatusLabel,
         samplingCompatibilityVerified: (candidate as any).samplingCompatibilityVerified,
         samplingCompatibilityNote: (candidate as any).samplingCompatibilityNote,
-    };
+        // Requirement-aware fields (backward-compatible)
+        ...(reqMatchLevel ? {
+            matchLevel: reqMatchLevel,
+            matchLevelExplanation,
+            requirementMatches: reqMatches,
+            requirementCoverage: reqCoverage,
+            hardConstraintScore,
+            technicalCompatibility,
+            scoringTrace,
+            satisfiedRequirements: satisfiedReqs,
+            missingRequirements: missingReqs,
+            unknownRequirements: unknownReqs,
+            conflictingRequirements: conflictingReqs,
+        } : {}),
+    } as RankedResult & Record<string, unknown>;
 
     return ranked;
 }

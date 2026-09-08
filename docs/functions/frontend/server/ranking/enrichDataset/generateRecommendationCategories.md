@@ -1,0 +1,11 @@
+# generateRecommendationCategories
+
+**File:** `src\server\ranking\enrichDataset.ts`
+
+## Description
+No description provided.
+
+## Signature
+```typescript
+function generateRecommendationCategories(datasets: any[], spec: any): Array<
+```

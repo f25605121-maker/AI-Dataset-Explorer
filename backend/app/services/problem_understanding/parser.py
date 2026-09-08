@@ -95,6 +95,16 @@ class ProblemUnderstandingEngine:
         if "missing" in lower or "incomplete" in lower:
             profile.data_constraints.missing_data = True
 
+        # Domain-specific requirements are first-class ranking dimensions.
+        profile.longitudinal = any(
+            term in lower for term in ("longitudinal", "over time", "follow-up", "trajectory", "progression")
+        )
+        population_terms = [
+            "older adults", "elderly", "pediatric", "children", "adult", "patients", "healthy controls",
+            "mci", "mild cognitive impairment", "women", "men",
+        ]
+        profile.population = [term for term in population_terms if term in lower]
+
         # Research temporal constraints
         range_match = re.search(r"(202\d)\s*[-–—]\s*(202\d)", lower)
         if range_match:

@@ -158,6 +158,35 @@ export function evaluateCandidateHardConstraints(
     }
 
     // ── 2. Anatomical & Pathology Conflict Filter ─────────────────────────────
+
+    // ── 2a. COPD / Pulmonary Disease Specificity Filter ──────────────────────
+    // If query is COPD-specific, reject lung cancer / non-COPD pulmonary datasets
+    // that would otherwise pass modality checks (CT matches CT).
+    const isCOPDQuery = (isSchema && /\bCOPD\b|chronic\s+obstructive\s+pulmonary|emphysema|spirometry|fev1|exacerbation/i.test(input.originalQuery)) ||
+        (!isSchema && /\bCOPD\b|chronic\s+obstructive\s+pulmonary|emphysema|spirometry|fev1|exacerbation/i.test(input.rawQuery));
+
+    if (isCOPDQuery) {
+        // Reject lung cancer candidates that are NOT COPD
+        const isLungCancerPrimary = isPrimarySubject('lung cancer', title, tags, desc) ||
+            isPrimarySubject('nsclc', title, tags, desc) ||
+            isPrimarySubject('non-small cell', title, tags, desc) ||
+            isPrimarySubject('adenocarcinoma', title, tags, desc) ||
+            (/lung\s*cancer|lung\s*carcinoma|nsclc/i.test(title) && !/copd|emphysema|spirometry|fev1|obstructive/i.test(candidateBlob));
+
+        if (isLungCancerPrimary && !/copd|emphysema|spirometry|fev1|exacerbation|obstructive/i.test(candidateBlob)) {
+            return {
+                passed: false,
+                reason: `Disease specificity conflict: Query specifies COPD / chronic obstructive pulmonary disease, but candidate is a lung cancer / oncology dataset [${title}]. These require different labels, populations, and predictive targets.`,
+                conflictType: 'domain',
+                isPrimaryConflict: true,
+                contradictionScore: 90,
+                penalties: [],
+                samplingCompatibilityVerified: false,
+                techniqueCompatibilityVerified: false,
+            };
+        }
+    }
+
     const isAlzheimerQuery = (isSchema && /alzheimer|dementia|mild\s*cognitive|\bmci\b|adni|oasis|apoe|cognitive\s*progression/i.test(input.originalQuery)) ||
         (!isSchema && /alzheimer|dementia|mild\s*cognitive|\bmci\b|adni|oasis|apoe|cognitive\s*progression/i.test(input.rawQuery));
     const isBrainTumorQuery = (isSchema && /brain\s*tumor|brain\s*cancer|glioma|glioblastoma|meningioma|\bbrats\b/i.test(input.originalQuery)) ||

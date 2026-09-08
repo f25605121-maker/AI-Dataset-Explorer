@@ -479,3 +479,87 @@ export interface ResearchSearchResponse {
     aiRationale?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// REQUIREMENT-AWARE CONFIDENCE SYSTEM TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type RequirementCategory =
+    | 'DOMAIN' | 'MODALITY' | 'TASK' | 'TARGET' | 'LONGITUDINAL'
+    | 'MULTIMODAL' | 'CLINICAL' | 'DATA_SIZE' | 'LABEL_AVAILABILITY'
+    | 'GPU' | 'COMPUTE' | 'MISSING_DATA' | 'CLASS_IMBALANCE'
+    | 'PRETRAINING' | 'TEMPORAL' | 'POPULATION' | 'OTHER';
+
+export type RequirementImportance = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type RequirementSatisfaction =
+    | 'SATISFIED' | 'PARTIAL' | 'NOT_SATISFIED' | 'UNKNOWN' | 'CONFLICT';
+
+/** Five-level match categorization — replaces the binary EXACT/PARTIAL label */
+export type MatchLevel =
+    | 'DIRECT_MATCH' | 'STRONG_MATCH' | 'PARTIAL_MATCH' | 'WEAK_MATCH' | 'NO_MATCH';
+
+export interface Requirement {
+    id: string;                        // e.g. "req_domain", "req_longitudinal"
+    description: string;               // human-readable requirement text
+    category: RequirementCategory;
+    importance: RequirementImportance;
+    isHard: boolean;                   // hard = violation caps final score
+    detectedValue: string;             // what was parsed from the query
+    weight: number;                    // 0–1, weights sum to 1.0 across all reqs
+}
+
+export interface RequirementMatch {
+    requirementId: string;
+    status: RequirementSatisfaction;
+    evidence: string | null;           // text snippet from candidate metadata
+    confidence: number;                // 0–1
+    explanation: string;               // one-line reason
+}
+
+export interface RequirementProfile {
+    requirements: Requirement[];
+    hardRequirementIds: string[];
+    softRequirementIds: string[];
+    gpuVramLimitGb: number | null;
+    isLongitudinal: boolean;
+    isMultimodal: boolean;
+    hasClinicalData: boolean;
+    hasClassImbalance: boolean;
+    hasMissingData: boolean;
+    primaryDomainKeywords: string[];
+    queryType: 'dataset' | 'model' | 'paper' | 'all';
+}
+
+export interface CalibratedScore {
+    finalScore: number;                // 0–100 after calibration + caps
+    matchLevel: MatchLevel;
+    requirementCoverage: number;       // 0–100 weighted coverage
+    hardConstraintScore: number;       // 0–100 (0 = critical violation present)
+    technicalCompatibility: number;    // 0–100 (especially for models)
+    matchLevelExplanation: string;     // one-line human reason
+    cappedBy: string | null;           // which cap rule triggered (null = no cap)
+    scoringTrace: {
+        crossEncoderContribution: number;
+        requirementContribution: number;
+        technicalContribution: number;
+        evidenceContribution: number;
+        rawBeforeCap: number;
+        appliedCap: number | null;
+        capReason: string | null;
+    };
+}
+
+/** Requirement-aware fields extended onto RankedResult (all optional for compat) */
+export interface RequirementAwareFields {
+    requirementMatches?: RequirementMatch[];
+    requirementCoverage?: number;
+    hardConstraintScore?: number;
+    technicalCompatibility?: number;
+    matchLevel?: MatchLevel;
+    matchLevelExplanation?: string;
+    scoringTrace?: CalibratedScore['scoringTrace'];
+    satisfiedRequirements?: string[];
+    missingRequirements?: string[];
+    unknownRequirements?: string[];
+    conflictingRequirements?: string[];
+}

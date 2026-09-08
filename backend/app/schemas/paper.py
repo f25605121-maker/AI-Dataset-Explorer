@@ -14,6 +14,11 @@ PaperCategory = Literal[
 
 class PaperScoreBreakdown(BaseModel):
     task_relevance: float = 0.0
+    domain_relevance: float = 0.0
+    modality_relevance: float = 0.0
+    disease_relevance: float = 0.0
+    population_relevance: float = 0.0
+    longitudinal_relevance: float = 0.0
     methodological_relevance: float = 0.0
     dataset_relevance: float = 0.0
     model_relevance: float = 0.0

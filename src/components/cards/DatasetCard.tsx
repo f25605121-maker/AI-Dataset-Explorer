@@ -50,6 +50,11 @@ export interface DatasetItem {
     potentialLimitations?: string[];
     samplingCompatibilityVerified?: boolean;
     samplingCompatibilityNote?: string;
+    matchLevel?: 'DIRECT_MATCH' | 'STRONG_MATCH' | 'PARTIAL_MATCH' | 'WEAK_MATCH' | 'NO_MATCH';
+    matchLevelExplanation?: string;
+    satisfiedRequirements?: string[];
+    missingRequirements?: string[];
+    unknownRequirements?: string[];
 }
 
 interface DatasetCardProps {
@@ -104,9 +109,15 @@ export default function DatasetCard({
     };
 
     const getScoreBadgeClass = (s: number) => {
-        if (s >= 85) return "status-badge-emerald";
-        if (s >= 70) return "status-badge-cyan";
-        return "status-badge-amber";
+        if (dataset.matchLevel === 'DIRECT_MATCH') return 'status-badge-emerald';
+        if (dataset.matchLevel === 'STRONG_MATCH') return 'status-badge-cyan';
+        if (dataset.matchLevel === 'PARTIAL_MATCH') return 'status-badge-amber';
+        if (dataset.matchLevel === 'WEAK_MATCH') return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40';
+        if (dataset.matchLevel === 'NO_MATCH') return 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+        // Fallback to score-based coloring
+        if (s >= 85) return 'status-badge-emerald';
+        if (s >= 70) return 'status-badge-cyan';
+        return 'status-badge-amber';
     };
 
     const getTierBadgeClass = (t: QualityTier) => {
@@ -153,7 +164,9 @@ export default function DatasetCard({
                         <ConfidenceBadge score={dataset.confidenceScore} showLabel={false} />
 
                         <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${getScoreBadgeClass(score)}`}>
-                            {score}% Match
+                            {dataset.matchLevel
+                                ? `${dataset.matchLevel.replace(/_/g, ' ')} • ${score}`
+                                : `${score}/100 Match`}
                         </span>
 
                         <button
@@ -294,7 +307,23 @@ export default function DatasetCard({
                 onClose={() => setBreakdownModalOpen(false)}
                 title={title}
                 score={score}
-                breakdown={dataset.scoreBreakdown}
+                matchLevel={(dataset as any).matchLevel}
+                matchLevelExplanation={(dataset as any).matchLevelExplanation}
+                breakdown={{
+                    ...dataset.scoreBreakdown,
+                    requirementCoverage: (dataset as any).requirementCoverage,
+                    hardConstraintScore: (dataset as any).hardConstraintScore,
+                    technicalCompatibility: (dataset as any).technicalCompatibility,
+                    semantic: dataset.matchBreakdown?.semantic,
+                    task: dataset.matchBreakdown?.task,
+                    domain: dataset.matchBreakdown?.domain,
+                }}
+                requirementMatches={(dataset as any).requirementMatches}
+                satisfiedRequirements={dataset.satisfiedRequirements}
+                missingRequirements={dataset.missingRequirements}
+                unknownRequirements={dataset.unknownRequirements}
+                conflictingRequirements={(dataset as any).conflictingRequirements}
+                scoringTrace={(dataset as any).scoringTrace}
                 why={dataset.whyMatches || (dataset.evidence ? dataset.evidence.map(e => e.claim) : [])}
                 warnings={dataset.warnings || []}
             />

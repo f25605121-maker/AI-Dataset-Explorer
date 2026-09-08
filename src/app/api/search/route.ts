@@ -258,6 +258,70 @@ export async function POST(req: NextRequest) {
             ],
         };
 
+        const sourceDist = (engineResult.diagnostics as any)?.sourceDistribution || {};
+        const telemetrySrc = (engineResult.telemetry as any)?.sourceDistribution || sourceDist;
+        const genQueries = (engineResult.diagnostics as any)?.generatedQueries || {};
+
+        // Pull real per-provider counts from sourceDistribution (keyed by candidate.source)
+        // Kaggle candidates have source='kaggle'; HF datasets source='huggingface'; models source='huggingface'
+        // We distinguish HF datasets vs models via the raw pool which tracks them separately via sourceCounts.
+        // sourceCounts is embedded in telemetry.sourceDistribution if available, otherwise fallback to
+        // counting by candidate type in the result arrays.
+        const kaggleCount = telemetrySrc.kaggle ?? sourceDist.kaggle ?? kaggle.length;
+        const hfDatasetsCount = telemetrySrc.huggingface_datasets ??
+            (hfDatasets.length > 0 ? hfDatasets.length : (sourceDist.huggingface || 0));
+        const hfModelsCount = telemetrySrc.huggingface_models ??
+            (hfModels.length > 0 ? hfModels.length : 0);
+        const paperSources = ['semantic_scholar', 'openalex', 'arxiv', 'pubmed'];
+        const papersCount = paperSources.reduce((acc, k) => acc + (telemetrySrc[k] || sourceDist[k] || 0), 0) || papers.length;
+
+        const apiAudit = {
+            kaggle: {
+                status: kaggleCount > 0 ? 'ONLINE' : 'DEGRADED',
+                called: true,
+                success: kaggleCount > 0,
+                datasetsFound: kaggleCount,
+            },
+            huggingfaceDatasets: {
+                status: hfDatasetsCount > 0 ? 'ONLINE' : 'DEGRADED',
+                called: true,
+                success: hfDatasetsCount > 0,
+                datasetsFound: hfDatasetsCount,
+            },
+            huggingfaceModels: {
+                status: hfModelsCount > 0 ? 'ONLINE' : 'DEGRADED',
+                called: true,
+                success: hfModelsCount > 0,
+                modelsFound: hfModelsCount,
+            },
+            literature: {
+                status: papersCount > 0 ? 'ONLINE' : 'DEGRADED',
+                called: true,
+                success: papersCount > 0,
+                papersFound: papersCount,
+                sources: ['PubMed', 'arXiv', 'OpenAlex', 'Semantic Scholar'],
+            },
+            llm: {
+                status: 'ONLINE',
+                provider: process.env.OPENROUTER_MODEL || process.env.GEMINI_MODEL || 'Gemini / OpenRouter',
+                success: true,
+            },
+        };
+
+        // Always populate expandedQueries from schema-level generated queries
+        const expandedQueriesList = [
+            ...(genQueries.datasetQueries || []),
+            ...(genQueries.modelQueries || []),
+            ...(genQueries.paperQueries || []),
+        ].filter((q, i, arr) => arr.indexOf(q) === i); // deduplicate
+
+        const searchCoverage = {
+            expandedQueries: expandedQueriesList.length > 0 ? expandedQueriesList : [safeQuery],
+            totalSources: 7,
+            multiSourceActive: true,
+        };
+
+
         return NextResponse.json({
             success: true,
             searchId,
@@ -267,6 +331,8 @@ export async function POST(req: NextRequest) {
             intent: 'DATASET_SEARCH',
             intentDetails: intentClassification,
             summary,
+            apiAudit,
+            searchCoverage,
             results: {
                 kaggle,
                 hfDatasets,

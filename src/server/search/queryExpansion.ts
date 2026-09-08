@@ -210,8 +210,25 @@ export function expandQueries(
         addQuery('ISIC skin lesion dataset', 1, 'dataset');
         addQuery('melanoma classification dermoscopy', 1, 'dataset');
         addQuery('skin cancer image dataset', 1, 'dataset');
+        addQuery('skin lesion', 1, 'dataset');
+        addQuery('dermoscopy skin cancer dataset', 1, 'dataset');
         addQuery('melanoma classification model', 1, 'model');
+        addQuery('EfficientNet skin lesion classification', 1, 'model');
+        addQuery('skin lesion classification deep learning', 1, 'paper');
+        addQuery('melanoma detection convolutional neural network', 1, 'paper');
         addQuery('ISIC challenge benchmark', 1, 'benchmark');
+
+        // TIER 2
+        addQuery('HAM10000 skin dataset', 2, 'dataset');
+        addQuery('skin lesion dermoscopy', 2, 'dataset');
+        addQuery('dermoscopy image classification', 2, 'model');
+        addQuery('isic melanoma dermoscopy deep learning', 2, 'paper');
+
+        // TIER 3 & 4
+        addQuery('skin cancer dermoscopy', 3, 'dataset');
+        addQuery('melanoma detection model', 3, 'model');
+        addQuery('skin cancer classification', 4, 'dataset');
+
     } else if (isAudioEmotion) {
         // ── Audio: Speech Emotion Recognition ───────────────────────────────────
         // TIER 1: Exact compound [Entity]+[Task]+[Modality]

@@ -47,6 +47,11 @@ export interface ModelItem {
     potentialLimitations?: string[];
     samplingCompatibilityVerified?: boolean;
     samplingCompatibilityNote?: string;
+    matchLevel?: 'DIRECT_MATCH' | 'STRONG_MATCH' | 'PARTIAL_MATCH' | 'WEAK_MATCH' | 'NO_MATCH';
+    matchLevelExplanation?: string;
+    satisfiedRequirements?: string[];
+    missingRequirements?: string[];
+    unknownRequirements?: string[];
 }
 
 interface ModelCardProps {
@@ -82,6 +87,15 @@ export default function ModelCard({ model }: ModelCardProps) {
         });
     };
 
+    const getScoreBadgeClass = () => {
+        if (model.matchLevel === 'DIRECT_MATCH') return 'status-badge-emerald';
+        if (model.matchLevel === 'STRONG_MATCH') return 'status-badge-cyan';
+        if (model.matchLevel === 'PARTIAL_MATCH') return 'status-badge-amber';
+        if (model.matchLevel === 'WEAK_MATCH') return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40';
+        if (model.matchLevel === 'NO_MATCH') return 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+        return 'status-badge-cyan';
+    };
+
     const getTierBadgeClass = (t: QualityTier) => {
         if (t === "Tier A") return "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
         if (t === "Tier B") return "bg-cyan-500/20 text-cyan-400 border-cyan-500/40";
@@ -113,8 +127,10 @@ export default function ModelCard({ model }: ModelCardProps) {
                     <div className="flex items-center gap-2">
                         <ConfidenceBadge score={model.confidenceScore} showLabel={false} />
 
-                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full border status-badge-cyan">
-                            {score}% Match
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${getScoreBadgeClass()}`}>
+                            {model.matchLevel
+                                ? `${model.matchLevel.replace(/_/g, ' ')} • ${score}`
+                                : `${score}/100 Match`}
                         </span>
 
                         <button
