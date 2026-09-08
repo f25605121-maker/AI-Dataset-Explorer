@@ -109,7 +109,7 @@ export default function LandingPage() {
                         </Link>
 
                         <Link
-                            href="/roadmaps"
+                            href="/roadmap"
                             className="px-6 py-3.5 border border-subtle bg-card hover:bg-card-hover text-secondary hover:text-primary font-semibold rounded-2xl text-sm transition flex items-center gap-2"
                         >
                             <span>Pipeline Roadmap</span>
