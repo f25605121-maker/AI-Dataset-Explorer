@@ -134,11 +134,31 @@ export function evaluateCandidateHardConstraints(
     // ── 1. Non-Medical Contradiction Filter (Applied only to Biomedical Queries) ─
     const isMedicalQuery = (isSchema && input.primaryDomain.toLowerCase().includes('biomedical')) ||
         (!isSchema && input.domain === 'medical_imaging');
+    const isAgricultureQuery = isSchema && input.primaryDomain === 'Agriculture & Plant Pathology';
 
-    if (isMedicalQuery) {
+    if (isMedicalQuery || isAgricultureQuery) {
         for (const nonMed of NON_MEDICAL_CONFLICT_DOMAINS) {
             const matches = nonMed.regexPatterns.some(rx => rx.test(candidateBlob));
             if (matches) {
+                // If agriculture, strictly block generic CV, face recognition, and generic CFD.
+                if (isAgricultureQuery) {
+                    if (nonMed.domain === 'generic_cv' || nonMed.domain === 'generic_cfd') {
+                        if (isPrimarySubject(nonMed.contradictionTerms[0], title, tags, desc)) {
+                            return {
+                                passed: false,
+                                reason: `Domain conflict: Query is an agricultural AI problem, but candidate relates to ${nonMed.label} (${title}).`,
+                                conflictType: 'domain',
+                                isPrimaryConflict: true,
+                                contradictionScore: 100,
+                                penalties: [],
+                                samplingCompatibilityVerified: false,
+                                techniqueCompatibilityVerified: false,
+                            };
+                        }
+                    }
+                    continue;
+                }
+
                 // Check if there is genuine biomedical grounding
                 const hasBiomedical = /patient|clinical|hospital|cardiac|heart|in\s*vivo|scan|dicom|mri|retina|fundus|tumor|cancer|brain|alzheimer|cell|nuclei/i.test(candidateBlob);
                 if (!hasBiomedical || isPrimarySubject(nonMed.contradictionTerms[0], title, tags, desc)) {
@@ -154,6 +174,22 @@ export function evaluateCandidateHardConstraints(
                     };
                 }
             }
+        }
+    }
+
+    if (isAgricultureQuery) {
+        const isBiomedical = /patient|clinical|hospital|cardiac|heart|dicom|mri|retina|fundus|tumor|cancer|brain|alzheimer|skin\s*lesion|melanoma/i.test(candidateBlob);
+        if (isBiomedical && !/plant|crop|leaf/i.test(candidateBlob)) {
+            return {
+                passed: false,
+                reason: `Domain conflict: Query is an agricultural AI problem, but candidate is a medical/biomedical dataset (${title}).`,
+                conflictType: 'domain',
+                isPrimaryConflict: true,
+                contradictionScore: 100,
+                penalties: [],
+                samplingCompatibilityVerified: false,
+                techniqueCompatibilityVerified: false,
+            };
         }
     }
 

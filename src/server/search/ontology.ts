@@ -626,6 +626,13 @@ export function getDynamicNegativeConcepts(queryText: string): {
         conflictingPatterns.push(/\bbrain\b/i, /\bcardiac\b/i, /\bheart\b/i, /\bretina\b/i, /\blung\b/i, /\bliver\b/i);
     }
 
+    const isAgriculture = /crop|plant|leaf|leaves|agriculture|farming|weed/i.test(qLower);
+    if (isAgriculture) {
+        excludedDomains.push('Medical / Biomedical', 'Face Recognition', 'Generic CFD');
+        excludedAnatomy.push('Brain', 'Heart', 'Liver', 'Kidney', 'Lung', 'Retina', 'Skin');
+        conflictingPatterns.push(/\bface\b/i, /\bfacial\b/i, /\bbrain\b/i, /\bcardiac\b/i, /\bretina\b/i, /\bmedical\b/i, /\bpatient\b/i);
+    }
+
     if (isCardiac) {
         excludedAnatomy.push(
             'Brain', 'Cerebral', 'Hippocampus', 'Glioma', 'Stroke', 'Neuro',

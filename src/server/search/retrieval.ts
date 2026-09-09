@@ -17,7 +17,7 @@ import { queryFastApiRecommend } from './fastapiClient';
 export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
     // 1. Try FastAPI Python Matching Pipeline first
     const fastApiRes = await queryFastApiRecommend(rawQuery);
-    if (fastApiRes && fastApiRes.datasets && fastApiRes.datasets.length > 0) {
+    if (fastApiRes && !fastApiRes.no_direct_match && fastApiRes.datasets && fastApiRes.datasets.length > 0) {
         const prof = fastApiRes.problem_profile || {};
         const datasets = fastApiRes.datasets.map(d => ({
             ...d,

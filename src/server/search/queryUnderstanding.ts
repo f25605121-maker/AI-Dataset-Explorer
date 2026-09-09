@@ -85,6 +85,11 @@ const DOMAIN_RULES: DomainMatchRule[] = [
         test: (q) => /lung|pulmonary|pneumonia|cxr|chest\s*x.?ray|pleural|bronchial/i.test(q),
     },
     {
+        domain: 'Agriculture & Plant Pathology',
+        subdomains: ['Crop Disease Detection', 'Plant Phenotyping', 'Precision Agriculture'],
+        test: (q) => /crop|plant|leaf|leaves|agriculture|farming|weed/i.test(q),
+    },
+    {
         domain: 'Structural Biology & Cryo-Microscopy',
         subdomains: ['Cryo-ET', 'Cryo-EM', 'Subtomogram Averaging', 'Macromolecular Structures'],
         test: (q) => /cryo[- ]?e[mt]|electron\s*tomograph|subtomogram|macromolecule|structural\s*biology/i.test(q),
@@ -322,6 +327,10 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         targetEntities.push("Credit Card Fraud", "Financial Anomaly");
         targetOutputs.push("Fraudulent Transaction Flags");
     }
+    if (/crop|plant|leaf|disease/i.test(qLower) && primaryDomain === 'Agriculture & Plant Pathology') {
+        targetEntities.push("Crop Plant", "Plant Leaf Disease");
+        targetOutputs.push("Crop Disease Classification Labels");
+    }
 
     if (/blood\s*flow|flow/i.test(qLower)) {
         physiologicalTargets.push('Blood flow', 'Vascular flow', 'Hemodynamics');
@@ -428,6 +437,11 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         modelQueries.push('StarDist nuclei segmentation', 'cellpose microscopy', 'U-Net nuclei segmentation');
         paperQueries.push('star convex nuclei segmentation fluorescence microscopy', 'few shot nuclei segmentation deep learning');
         benchmarkQueries.push('MoNuSeg challenge', 'CoNSeP benchmark');
+    } else if (primaryDomain === 'Agriculture & Plant Pathology') {
+        datasetQueries.push('plant disease classification dataset', 'crop leaf disease images', 'plantvillage dataset');
+        modelQueries.push('plant disease classification model', 'resnet50 plant disease');
+        paperQueries.push('deep learning crop disease classification', 'plant pathology image classification');
+        benchmarkQueries.push('PlantVillage', 'Plant Pathology Challenge');
     } else {
         const primaryTarget = targetEntities[0] || anatomy[0] || (q.length > 30 ? q.slice(0, 30) : q);
         const primaryMod = modalities[0] && modalities[0] !== 'Multimodal / General' ? modalities[0] : '';
