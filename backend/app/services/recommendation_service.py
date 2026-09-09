@@ -56,6 +56,11 @@ class RecommendationPipelineService:
         t_llm_start = time.time()
         profile: ProblemProfile = await self.parser.analyze_problem(query)
         llm_latency = (time.time() - t_llm_start) * 1000
+        logger.info(
+            "recommendation query=%r domain=%s subdomains=%s tasks=%s modalities=%s keywords=%s",
+            query[:500], profile.domains, profile.subdomains, [task.name for task in profile.tasks],
+            profile.modalities, profile.keywords,
+        )
 
         # ── STAGE 2: Query Expansion ───────────────────────────────────────────
         expanded_queries: List[str] = self.expander.expand(profile)
@@ -71,6 +76,7 @@ class RecommendationPipelineService:
         papers_pool = [self._paper_to_dict(p) for p in ppr_res.scalars().all()]
 
         primary_query = expanded_queries[0] if expanded_queries else query
+        logger.info("recommendation search_queries=%s", expanded_queries[:8])
 
         # ── STAGE 4: Hybrid Dense + Sparse Retrieval ───────────────────────────
         # Datasets
@@ -87,11 +93,21 @@ class RecommendationPipelineService:
         ppr_dense = await self.dense_search.search(primary_query, papers_pool, top_k=30)
         ppr_sparse = self.bm25_search.search(primary_query, papers_pool, top_k=30)
         ppr_fused = self.rrf.fuse([ppr_dense, ppr_sparse], top_k=30)
+        logger.info(
+            "recommendation retrieved datasets=%d models=%d papers=%d",
+            len(ds_fused), len(mdl_fused), len(ppr_fused),
+        )
 
         # ── STAGE 5: Hard Constraint Filtering ─────────────────────────────────
         ds_passed, ds_rejected = self.hard_filter.filter_datasets(ds_fused, profile)
         mdl_passed, mdl_rejected = self.hard_filter.filter_models(mdl_fused, profile)
         ppr_passed, ppr_rejected = self.hard_filter.filter_papers(ppr_fused, profile)
+        logger.info(
+            "recommendation filtered datasets=%d models=%d papers=%d rejected=%d reasons=%s",
+            len(ds_passed), len(mdl_passed), len(ppr_passed),
+            len(ds_rejected) + len(mdl_rejected) + len(ppr_rejected),
+            [item.get("rejection_reason") for item in (ds_rejected + mdl_rejected + ppr_rejected)[:10]],
+        )
 
         # ── STAGE 6: Cross-Linking Triples ─────────────────────────────────────
         ds_linked, mdl_linked, ppr_linked, relationships = self.cross_linker.link_and_boost(
@@ -108,6 +124,12 @@ class RecommendationPipelineService:
         ranked_datasets = self.scorer.score_datasets(ds_reranked, profile)
         ranked_models = self.scorer.score_models(mdl_reranked, profile)
         ranked_papers = self.scorer.score_papers(ppr_reranked, profile)
+        logger.info(
+            "recommendation top_datasets=%s top_models=%s top_papers=%s",
+            [(item.name, item.score) for item in ranked_datasets[:5]],
+            [(item.name, item.score) for item in ranked_models[:5]],
+            [(item.title, item.score) for item in ranked_papers[:5]],
+        )
 
         # ── STAGE 9: Scientific Consistency Verification ───────────────────────
         top_ds = ranked_datasets[0] if ranked_datasets else None

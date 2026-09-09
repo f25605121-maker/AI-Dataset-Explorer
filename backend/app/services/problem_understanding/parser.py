@@ -1,6 +1,6 @@
 import re
 from typing import Dict, Any
-from backend.app.schemas.problem_profile import ProblemProfile
+from backend.app.schemas.problem_profile import ProblemProfile, TaskItem
 from backend.app.providers.llm.factory import get_llm_provider
 from backend.app.core.security import sanitize_search_query, scan_prompt_injection
 
@@ -53,6 +53,31 @@ class ProblemUnderstandingEngine:
 
     def _refine_constraints(self, text: str, profile: ProblemProfile) -> None:
         lower = text.lower()
+
+        # Preserve explicit scientific requirements when structured extraction is uncertain.
+        if re.search(r"\b(?:crop|plant|leaf|leaves|agriculture|farming|plant pathology)\b", lower):
+            if not any("agriculture" in domain.lower() or "plant" in domain.lower() for domain in profile.domains):
+                profile.domains.insert(0, "Agriculture & Plant Pathology")
+            if not any("plant" in subdomain.lower() or "crop" in subdomain.lower() for subdomain in profile.subdomains):
+                profile.subdomains.insert(0, "Crop Disease Detection")
+            if not any("image" in modality.lower() or "photo" in modality.lower() for modality in profile.modalities):
+                profile.modalities.insert(0, "Image")
+            if not any("classification" in task.name.lower() for task in profile.tasks):
+                profile.tasks.insert(0, TaskItem(name="image classification", confidence=1.0))
+            profile.input.description = profile.input.description or "Plant leaf photographs"
+            if "Image" not in profile.input.modalities:
+                profile.input.modalities.insert(0, "Image")
+            profile.output.description = profile.output.description or "Healthy versus specific plant disease labels"
+            profile.output.type = profile.output.type or "multi-class classification"
+            for keyword in ("plant leaf", "crop disease", "healthy", "diseased"):
+                if keyword not in [item.lower() for item in profile.keywords]:
+                    profile.keywords.append(keyword)
+            profile.search_queries = [
+                "plant disease leaf image classification",
+                "crop disease leaf dataset",
+                "healthy diseased plant leaves",
+                "plant pathology image dataset",
+            ]
 
         # Hard compute constraints: GPU VRAM
         gpu_match = re.search(r"(\d+)\s*(?:gb|gigabyte)\s*gpu", lower)

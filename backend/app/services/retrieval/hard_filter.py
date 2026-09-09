@@ -1,3 +1,4 @@
+import re
 from typing import List, Dict, Any, Tuple
 from backend.app.schemas.problem_profile import ProblemProfile
 
@@ -8,13 +9,76 @@ class HardConstraintFilter:
     Zero tolerance for compute, modality, or temporal hard constraint violations.
     """
 
-    def filter_datasets(
+    @staticmethod
+    def _candidate_text(candidate: Dict[str, Any]) -> str:
+        values = [
+            candidate.get("name"), candidate.get("title"), candidate.get("description"),
+            candidate.get("abstract"), candidate.get("domain"), candidate.get("task"),
+            candidate.get("modality"), candidate.get("modalities"), candidate.get("domains"),
+            candidate.get("subdomains"), candidate.get("paper_type"),
+        ]
+        return " ".join(str(value) for value in values if value).lower()
+
+    @staticmethod
+    def _domain_conflict(text: str, profile: ProblemProfile) -> str | None:
+        query = profile.original_problem.lower()
+        requested = " ".join(profile.domains + profile.subdomains).lower()
+
+        if re.search(r"\b(?:crop|plant|leaf|leaves|agriculture|farming|plant pathology)\b", query):
+            if not re.search(r"\b(?:plant|crop|leaf|leaves|agricultur|botan|phytopath)\b", text) and re.search(
+                r"\b(?:skin lesion|melanoma|face recognition|facial|chest x.?ray|cxr|ultrasound|mri|brain|retina|fundus|patient|clinical|medical|biomedical|isic)\b",
+                text,
+            ):
+                return "candidate is medical or human-vision data, not plant/agriculture data"
+        elif re.search(r"\b(?:medical|clinical|patient|biomedical|mri|ct scan|ultrasound|radiology)\b", requested + " " + query):
+            if re.search(r"\b(?:plant|crop|leaf|agricultur|phytopath)\b", text) and not re.search(
+                r"\b(?:patient|clinical|medical|biomedical|radiolog|mri|ct)\b", text
+            ):
+                return "candidate is agriculture data for a medical query"
+        elif re.search(r"\b(?:speech|audio|acoustic|voice)\b", query):
+            if re.search(r"\b(?:image|photo|leaf|skin|x.?ray|mri|ct)\b", text) and not re.search(r"\b(?:audio|speech|voice|wav)\b", text):
+                return "candidate is image data for an audio query"
+        elif re.search(r"\b(?:cybersecurity|cyber security|network traffic|http request|intrusion)\b", query):
+            if re.search(r"\b(?:medical|clinical|patient|plant|crop|leaf|mri|x.?ray|ultrasound)\b", text):
+                return "candidate is outside the cybersecurity domain"
+
+        if re.search(r"\b(?:classif|classify|classification)\b", query):
+            if re.search(r"\b(?:segmentation|reconstruction|forecasting|generation)\b", text) and not re.search(
+                r"\b(?:classif|classify|classification)\b", text
+            ):
+                return "candidate task is not image classification"
+        elif re.search(r"\b(?:segment|segmentation)\b", query):
+            if re.search(r"\b(?:classification|classify|forecasting|generation)\b", text) and not re.search(
+                r"\b(?:segment|segmentation)\b", text
+            ):
+                return "candidate task is not segmentation"
+
+        return None
+
+    def _reject_domain_conflict(
         self,
         candidates: List[Tuple[Dict[str, Any], float]],
         profile: ProblemProfile,
     ) -> Tuple[List[Tuple[Dict[str, Any], float]], List[Dict[str, Any]]]:
         passed: List[Tuple[Dict[str, Any], float]] = []
         rejected: List[Dict[str, Any]] = []
+        for cand, score in candidates:
+            reason = self._domain_conflict(self._candidate_text(cand), profile)
+            if reason:
+                cand["rejection_reason"] = f"Domain conflict: {reason}"
+                rejected.append(cand)
+            else:
+                passed.append((cand, score))
+        return passed, rejected
+
+    def filter_datasets(
+        self,
+        candidates: List[Tuple[Dict[str, Any], float]],
+        profile: ProblemProfile,
+    ) -> Tuple[List[Tuple[Dict[str, Any], float]], List[Dict[str, Any]]]:
+        passed, rejected = self._reject_domain_conflict(candidates, profile)
+        candidates = passed
+        passed = []
 
         req_modalities = [m.lower() for m in profile.modalities]
 
@@ -48,8 +112,9 @@ class HardConstraintFilter:
         candidates: List[Tuple[Dict[str, Any], float]],
         profile: ProblemProfile,
     ) -> Tuple[List[Tuple[Dict[str, Any], float]], List[Dict[str, Any]]]:
-        passed: List[Tuple[Dict[str, Any], float]] = []
-        rejected: List[Dict[str, Any]] = []
+        passed, rejected = self._reject_domain_conflict(candidates, profile)
+        candidates = passed
+        passed = []
 
         max_gpu_vram = profile.compute_constraints.gpu_memory_gb
         max_latency_ms = profile.compute_constraints.latency_ms
@@ -87,8 +152,9 @@ class HardConstraintFilter:
         candidates: List[Tuple[Dict[str, Any], float]],
         profile: ProblemProfile,
     ) -> Tuple[List[Tuple[Dict[str, Any], float]], List[Dict[str, Any]]]:
-        passed: List[Tuple[Dict[str, Any], float]] = []
-        rejected: List[Dict[str, Any]] = []
+        passed, rejected = self._reject_domain_conflict(candidates, profile)
+        candidates = passed
+        passed = []
 
         min_year = profile.research_constraints.minimum_year
 

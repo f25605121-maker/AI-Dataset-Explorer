@@ -96,6 +96,10 @@ export interface ResearchQuerySchema {
     benchmarkQueries: string[];
     ontologyTerms: string[];
     confidence: number;
+    object?: string;
+    labels?: string[];
+    preferredSources?: string[];
+    negativeConstraints?: string[];
 }
 
 export interface MatchBreakdown {
