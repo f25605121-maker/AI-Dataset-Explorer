@@ -41,7 +41,6 @@ import { deduplicateCandidates } from './deduplication';
 import { applyHardConstraints } from './hardConstraints';
 import { rerankCandidates, rerankCandidatesWithConfidence } from './reranker';
 import { buildResearchGraph } from './ranking';
-import { getFallbackBaselineModels } from './modelsFallback';
 import { getCachedSearch, setCachedSearch, SEARCH_ENGINE_VERSION } from './cache';
 import { callLlm } from '../assistant/llmProvider';
 
@@ -93,13 +92,8 @@ export async function advancedResearchSearch(
     let passedModels = filteredModels.passed;
     let passedPapers = filteredPapers.passed;
 
-    // ── STAGE 15: Zero-Fabrication Pretrained Model Baseline Reference ────────
-    // If no exact pretrained models passed hard constraints, add authentic research architecture baselines
-    if (passedModels.length === 0) {
-        const baselines = getFallbackBaselineModels(understanding);
-        const baselineEval = applyHardConstraints(baselines, schema);
-        passedModels.push(...baselineEval.passed);
-    }
+    // Empty retrieval remains empty. Do not fabricate or inject architecture
+    // baselines when no verified model candidate passed compatibility checks.
 
     const totalAfterFiltering = passedDatasets.length + passedModels.length + passedPapers.length;
 

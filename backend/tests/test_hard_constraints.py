@@ -70,23 +70,3 @@ def test_year_hard_constraint_rejection():
 
     assert "New Paper 2024" in passed_titles
     assert "Old Paper 2018" not in passed_titles
-
-
-def test_agriculture_query_rejects_incompatible_medical_dataset():
-    filter_svc = HardConstraintFilter()
-    profile = ProblemProfile(
-        original_problem="Plant leaf disease image classification",
-        domains=["Agriculture & Plant Pathology"],
-        subdomains=["Crop Disease Detection"],
-        modalities=["Image"],
-    )
-
-    candidates = [
-        ({"name": "Plant leaf disease images", "description": "Healthy and diseased crop leaves", "modalities": ["Image"]}, 0.8),
-        ({"name": "ISIC skin lesion classification", "description": "Dermoscopic human skin images", "modalities": ["Image"]}, 0.95),
-    ]
-
-    passed, rejected = filter_svc.filter_datasets(candidates, profile)
-
-    assert [candidate[0]["name"] for candidate in passed] == ["Plant leaf disease images"]
-    assert rejected[0]["name"] == "ISIC skin lesion classification"

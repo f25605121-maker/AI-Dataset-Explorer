@@ -462,21 +462,14 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
     }
 
     const confidence = 92;
-    const isAgricultureQuery = primaryDomain === 'Agriculture & Plant Pathology';
-    const object = isAgricultureQuery && /leaf|leaves|plant|crop/i.test(qLower)
-        ? 'plant leaf'
-        : targetEntities[0] || anatomy[0] || undefined;
-    const labels = isAgricultureQuery && /disease|healthy|diseased|classif/i.test(qLower)
-        ? ['healthy', 'diseased', 'specific plant diseases']
-        : undefined;
+    const object = targetEntities[0] || anatomy[0] || undefined;
+    const labels = /label|classif|healthy|diseased/i.test(qLower) ? ['user-specified labels'] : undefined;
     const preferredSources = /kaggle/i.test(qLower) || /hugging\s*face/i.test(qLower)
         ? ['kaggle', 'huggingface']
         : undefined;
-    const negativeConstraints = isAgricultureQuery
-        ? ['human skin', 'face', 'chest x-ray', 'ultrasound', 'brain', 'medical imaging']
-        : excludedDomains.length > 0 || excludedAnatomy.length > 0
-            ? [...excludedDomains, ...excludedAnatomy]
-            : undefined;
+    const negativeConstraints = excludedDomains.length > 0 || excludedAnatomy.length > 0
+        ? [...excludedDomains, ...excludedAnatomy]
+        : undefined;
 
     return {
         originalQuery: q,

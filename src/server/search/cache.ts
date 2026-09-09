@@ -13,6 +13,7 @@
  */
 
 import { ResearchSearchResponse } from './types';
+import { getRequirementProfile } from './requirementExtractor';
 
 export const SEARCH_ENGINE_VERSION = '2.0.0';
 
@@ -35,7 +36,12 @@ function normalizeQueryKey(query: string): string {
 
 export function computeCacheKey(query: string, version = SEARCH_ENGINE_VERSION): string {
     const norm = normalizeQueryKey(query);
-    return `aide:v${version}:${norm}`;
+    const profile = getRequirementProfile(query);
+    const requirements = profile.requirements
+        .map(requirement => `${requirement.id}:${requirement.detectedValue}:${requirement.isHard ? 'hard' : 'soft'}`)
+        .sort()
+        .join('|');
+    return `aide:v${version}:${norm}:req:${normalizeQueryKey(requirements)}`;
 }
 
 export function getCachedSearch(

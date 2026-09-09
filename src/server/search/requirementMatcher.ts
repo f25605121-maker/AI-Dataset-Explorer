@@ -33,6 +33,19 @@ function buildBlob(candidate: UnifiedCandidate): string {
     return parts.map(clean).join(" ");
 }
 
+function matchGenericRequirement(candidate: UnifiedCandidate, req: RequirementProfile['requirements'][number], blob: string): RequirementMatch {
+    const values = req.detectedValue.split(/[,;]|\s+or\s+/i).map(value => value.trim()).filter(Boolean);
+    const negative = req.id === 'req_negative';
+    const matched = values.filter(value => blob.includes(value.toLowerCase()));
+    if (negative && matched.length > 0) {
+        return { requirementId: req.id, status: 'CONFLICT', evidence: matched.join(', '), confidence: 0.9, explanation: `Excluded concept found in resource metadata: ${matched.join(', ')}` };
+    }
+    if (negative) return { requirementId: req.id, status: 'SATISFIED', evidence: null, confidence: 0.7, explanation: 'No excluded concept found in available metadata' };
+    if (matched.length === values.length && values.length > 0) return { requirementId: req.id, status: 'SATISFIED', evidence: matched.join(', '), confidence: 0.8, explanation: 'Requirement confirmed in resource metadata' };
+    if (matched.length > 0) return { requirementId: req.id, status: 'PARTIAL', evidence: matched.join(', '), confidence: 0.5, explanation: 'Some requirement terms found in resource metadata' };
+    return { requirementId: req.id, status: 'UNKNOWN', evidence: null, confidence: 0, explanation: 'Requirement is not specified in available resource metadata' };
+}
+
 // ── Domain matching ────────────────────────────────────────────────────────────
 
 interface DomainMatcher {
@@ -310,7 +323,7 @@ export function matchCandidateRequirements(
                 const ratio = tasks.length > 0 ? matched / tasks.length : 0;
                 m = {
                     requirementId: req.id,
-                    status: ratio >= 0.8 ? "SATISFIED" : ratio >= 0.4 ? "PARTIAL" : tasks.length > 0 ? "UNKNOWN" : "NOT_SATISFIED",
+                    status: ratio >= 0.8 ? "SATISFIED" : ratio >= 0.4 ? "PARTIAL" : tasks.length > 0 ? "NOT_SATISFIED" : "UNKNOWN",
                     evidence: evidenceParts.length > 0 ? `Tasks found: ${evidenceParts.join(", ")}` : null,
                     confidence: ratio,
                     explanation: ratio > 0 ? `${matched}/${tasks.length} required tasks found in metadata` : "Required tasks not found in metadata",
@@ -459,7 +472,7 @@ export function matchCandidateRequirements(
             case "COMPUTE":
             case "OTHER":
             default:
-                m = { requirementId: req.id, status: "UNKNOWN", evidence: null, confidence: 0, explanation: "Not explicitly evaluated for this requirement category" };
+                m = matchGenericRequirement(candidate, req, blob);
                 break;
         }
 

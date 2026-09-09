@@ -43,7 +43,6 @@ export function evaluateCandidateCrossEncoder(
 
     const rawDomain = isSchema ? (understanding.primaryDomain || '') : (understanding.domain || '');
     const isMedicalImaging = rawDomain.toLowerCase().includes('medical') || rawDomain.toLowerCase().includes('cardiac') || rawDomain.toLowerCase().includes('neuro') || rawDomain === 'medical_imaging';
-    const isAgriculture = /agriculture|plant|crop|botany|plant pathology/i.test(rawDomain);
 
     const modalities: string[] = isSchema
         ? (Array.isArray(understanding.modalities) ? understanding.modalities : [])
@@ -73,8 +72,6 @@ export function evaluateCandidateCrossEncoder(
     const tags = (candidate.tags || []).map(clean).join(' ');
     const formats = (candidate.formats || []).map(clean).join(' ');
     const candidateBlob = `${title} ${tags} ${desc} ${formats} ${clean(candidate.modality)} ${clean(candidate.task)}`;
-    const hasPlantSubject = /plant|crop|leaf|leaves|agricultur|botan|phytopath/i.test(candidateBlob);
-    const hasIncompatibleSubject = /skin lesion|melanoma|face recognition|facial|chest x.?ray|cxr|ultrasound|mri|brain|retina|fundus|patient|clinical|medical|biomedical|isic/i.test(candidateBlob);
 
     // ── 1. Anatomy Match (0.0 - 1.0) ─────────────────────────────────────────
     let anatomyMatch = 0.5; // Neutral default if anatomy not in query
@@ -178,15 +175,12 @@ export function evaluateCandidateCrossEncoder(
         for (const tgt of targets) {
             if (candidateBlob.includes(clean(tgt))) matchedCount++;
         }
-        if (isAgriculture && hasPlantSubject) matchedCount = Math.max(matchedCount, 1);
         targetMatch = Math.min(1.0, (matchedCount / targets.length) * 0.9 + 0.1);
     }
 
     // ── 6. Domain Match (0.0 - 1.0) ──────────────────────────────────────────
     let domainMatch = 0.8;
-    if (isAgriculture) {
-        domainMatch = hasPlantSubject ? 1.0 : hasIncompatibleSubject ? 0.0 : 0.15;
-    } else if (isMedicalImaging) {
+    if (isMedicalImaging) {
         domainMatch = /medical|radiology|clinical|hospital|scan|mri|ct|lesion|tumor/i.test(candidateBlob) ? 1.0 : 0.2;
     } else if (/audio|speech/i.test(rawDomain)) {
         domainMatch = /audio|speech|voice|sound|acoustic|wav/i.test(candidateBlob) ? 1.0 : 0.2;

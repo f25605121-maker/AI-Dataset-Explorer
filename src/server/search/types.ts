@@ -510,6 +510,8 @@ export interface Requirement {
     isHard: boolean;                   // hard = violation caps final score
     detectedValue: string;             // what was parsed from the query
     weight: number;                    // 0–1, weights sum to 1.0 across all reqs
+    confidence?: number;
+    source?: 'explicit' | 'inferred' | 'metadata' | 'llm' | 'user-provided';
 }
 
 export interface RequirementMatch {
@@ -532,6 +534,16 @@ export interface RequirementProfile {
     hasMissingData: boolean;
     primaryDomainKeywords: string[];
     queryType: 'dataset' | 'model' | 'paper' | 'all';
+    domain?: string | null;
+    subdomain?: string | null;
+    object?: string | null;
+    input?: { type?: string | null; modality?: string | null; format?: string | null; dimensions?: string | null; structure?: string | null };
+    output?: { type?: string | null; format?: string | null; labels?: string[]; classes?: string[] };
+    entities?: string[];
+    preferences?: string[];
+    negativeRequirements?: string[];
+    datasetRequirements?: { minimumSize?: number | null; maximumSize?: number | null; annotationRequired?: boolean | null; labelRequired?: boolean | null; license?: string[]; source?: string[]; publicAccess?: boolean | null };
+    researchRequirements?: { year?: number | null; venue?: string[]; datasetSpecific?: boolean | null };
 }
 
 export interface CalibratedScore {
