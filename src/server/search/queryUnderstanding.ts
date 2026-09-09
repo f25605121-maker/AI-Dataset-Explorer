@@ -538,7 +538,7 @@ export function understandQuery(rawQuery: string): StructuredQueryUnderstanding 
 
     return {
         rawQuery: parsed.originalQuery,
-        domain: isMed ? 'medical_imaging' : 'general_machine_learning',
+        domain: parsed.primaryDomain,
         task: primaryTask,
         taskVariants: [...parsed.reconstructionTasks, ...parsed.estimationTasks, ...parsed.predictionTasks],
         anatomy: extractedAnatomy,
