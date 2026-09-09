@@ -9,9 +9,9 @@ def get_llm_provider() -> LLMProvider:
     Factory function returning the configured LLM provider per Section 60.
     Falls back to deterministic MockLLMProvider if keys are absent.
     """
-    has_key = bool(settings.OPENROUTER_API_KEY or settings.OPENAI_API_KEY)
+    has_key = bool(settings.OPENAI_API_KEY)
     
-    if has_key and settings.LLM_PROVIDER in ("openrouter", "openai"):
+    if has_key and settings.LLM_PROVIDER == "openai":
         return OpenAICompatibleLLMProvider()
     
     # Default graceful fallback

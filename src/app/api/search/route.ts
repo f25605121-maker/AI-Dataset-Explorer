@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
             },
             llm: {
                 status: 'ONLINE',
-                provider: process.env.OPENROUTER_MODEL || process.env.GEMINI_MODEL || 'Gemini / OpenRouter',
+                provider: process.env.GEMINI_MODEL || 'Gemini',
                 success: true,
             },
         };

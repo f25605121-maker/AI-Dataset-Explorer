@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
         gemini:       { configured: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY), model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' },
-        openrouter:   { configured: !!process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini' },
+
         kaggle:       { configured: !!(process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) },
         huggingface:  { configured: !!process.env.HUGGING_FACE_TOKEN },
     });

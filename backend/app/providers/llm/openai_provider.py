@@ -10,13 +10,13 @@ T = TypeVar("T", bound=BaseModel)
 
 class OpenAICompatibleLLMProvider(LLMProvider):
     """
-    OpenAI-compatible LLM provider. Supports OpenAI, OpenRouter, Local Ollama/vLLM.
+    OpenAI-compatible LLM provider. Supports OpenAI, Local Ollama/vLLM.
     """
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or settings.OPENROUTER_API_KEY or settings.OPENAI_API_KEY or ""
-        self.base_url = base_url or ("https://openrouter.ai/api/v1" if settings.OPENROUTER_API_KEY else "https://api.openai.com/v1")
-        self.model = model or settings.OPENROUTER_MODEL
+        self.api_key = api_key or settings.OPENAI_API_KEY or ""
+        self.base_url = base_url or "https://api.openai.com/v1"
+        self.model = model or "gpt-4o-mini"
 
     async def generate_structured(
         self,

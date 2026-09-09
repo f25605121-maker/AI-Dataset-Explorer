@@ -38,13 +38,11 @@ class Settings(BaseSettings):
     ]
     RATE_LIMIT_RPM: int = 60
 
-    # LLM Providers (OpenAI, Anthropic, Google, OpenRouter, Mock)
-    LLM_PROVIDER: str = "openrouter"  # 'openai' | 'anthropic' | 'google' | 'openrouter' | 'mock'
+    # LLM Providers (OpenAI, Anthropic, Google, Mock)
+    LLM_PROVIDER: str = "google"  # 'openai' | 'anthropic' | 'google' | 'mock'
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
-    OPENROUTER_API_KEY: Optional[str] = None
-    OPENROUTER_MODEL: str = "openai/gpt-4o-mini"
 
     # Embeddings Provider
     EMBEDDING_PROVIDER: str = "local"  # 'hosted' | 'local' | 'mock'

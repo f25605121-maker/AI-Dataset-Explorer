@@ -56,7 +56,7 @@ export interface OrchestratorOptions {
 export async function runUnifiedOrchestrator(options: OrchestratorOptions): Promise<Partial<AssistantResponse>> {
     const { query, messages, context, searchId } = options;
 
-    // Step 1: Classify intent (uses Gemini or OpenRouter via llmProvider)
+    // Step 1: Classify intent (uses Gemini via llmProvider)
     const intentClassification = await classifyIntent(query);
     const responseType = intentToResponseType(intentClassification.intent);
 

@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
                             "style-src 'self' 'unsafe-inline'",
                             "img-src 'self' data: https: blob:",
                             "font-src 'self' data:",
-                            "connect-src 'self' https://openrouter.ai https://huggingface.co https://www.kaggle.com https://accounts.google.com https://generativelanguage.googleapis.com",
+                            "connect-src 'self' https://huggingface.co https://www.kaggle.com https://accounts.google.com https://generativelanguage.googleapis.com",
                             "frame-src https://accounts.google.com",
                             "form-action 'self'",
                             "base-uri 'self'",
