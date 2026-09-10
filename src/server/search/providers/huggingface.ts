@@ -132,10 +132,8 @@ export async function fetchHuggingFaceModels(
 
     for (const q of queries.slice(0, 4)) {
         try {
-            // Build URL: append pipeline_tag filter when we can reliably determine the task.
-            // This significantly improves precision for audio, NLP, tabular, and vision sub-tasks.
-            const pipelineTagParam = hfPipelineTag ? `&pipeline_tag=${encodeURIComponent(hfPipelineTag)}` : '';
-            const url = `${HF_MODELS_API}?search=${encodeURIComponent(q)}&full=true&limit=30${pipelineTagParam}`;
+            // HF pipeline_tag is often inaccurate for medical models (e.g. tagging detection as classification)
+            const url = `${HF_MODELS_API}?search=${encodeURIComponent(q)}&full=true&limit=30`;
 
             const ctrl = new AbortController();
             const tid = setTimeout(() => ctrl.abort(), 6000);
