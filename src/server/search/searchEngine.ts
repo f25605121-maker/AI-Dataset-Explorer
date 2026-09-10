@@ -97,7 +97,7 @@ export async function advancedResearchSearch(
 
     const totalAfterFiltering = passedDatasets.length + passedModels.length + passedPapers.length;
 
-    // ── STAGE 7-11: Scoring, Re-ranking, Evidence & Confidence Calibration ───
+    // 🔬 STAGE 7-11: Scoring, Re-ranking, Evidence & Confidence Calibration 🔬
     // Uses the standardized 4-factor formula with zero-multiplier rule.
     // After scoring, evaluates result-set confidence status.
     const datasetRerankResult = rerankCandidatesWithConfidence(passedDatasets, schema, 25);

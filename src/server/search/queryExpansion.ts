@@ -333,7 +333,17 @@ export function expandQueries(
         // Strategy: extract [Entity/Target] + [Task] + [Modality] tokens from the query
         // and build compound search strings. Never fall back to single bare tokens.
         //
-        const primaryAnatomy = isSchema ? (input.anatomy[0] || '') : (input.anatomy.primary[0] || '');
+        let primaryAnatomy = isSchema ? (input.anatomy[0] || '') : (input.anatomy.primary[0] || '');
+        // If primary anatomy is an internal canonical ID (all caps, e.g. PULMONARY_LUNG), fallback to the natural language synonym
+        if (primaryAnatomy && /^[A-Z_]+$/.test(primaryAnatomy)) {
+            const fallback = isSchema ? input.anatomy[1] : input.anatomy.primary?.[1];
+            if (fallback) {
+                primaryAnatomy = fallback;
+            } else {
+                // If no fallback is provided, map it manually or just make it lowercase
+                primaryAnatomy = primaryAnatomy.toLowerCase().replace(/_/g, ' ');
+            }
+        }
         const primaryModality = isSchema ? (input.modalities[0] || '') : (input.modality[0] || '');
         const primaryTask = isSchema
             ? (input.reconstructionTasks[0] || input.estimationTasks[0] || input.predictionTasks[0] || '')
