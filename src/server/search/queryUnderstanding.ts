@@ -62,7 +62,7 @@ const DOMAIN_RULES: DomainMatchRule[] = [
     {
         domain: 'Biomedical / Dermatology & Skin Oncology',
         subdomains: ['Melanoma Detection', 'Skin Lesion Classification', 'Dermoscopy'],
-        test: (q) => /skin|melanoma|lesion|isic|dermoscop|dermatolog/i.test(q),
+        test: (q) => /skin|melanoma|skin\s*lesion|isic|dermoscop|dermatolog/i.test(q),
     },
     {
         domain: 'Biomedical / Cellular Biology & Digital Pathology',

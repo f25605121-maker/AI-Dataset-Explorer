@@ -72,6 +72,8 @@ export async function advancedResearchSearch(
     const totalRetrieved = rawPools.allCandidates.length;
 
     // ── STAGE 5: Cross-Source Deduplication ───────────────────────────────────
+
+
     const dedupedDatasets = deduplicateCandidates(rawPools.datasets);
     const dedupedModels = deduplicateCandidates(rawPools.models);
     const dedupedPapers = deduplicateCandidates(rawPools.papers);
@@ -162,7 +164,7 @@ export async function advancedResearchSearch(
     const isAlzheimerQuery = /alzheimer|dementia|mild\s*cognitive|\bmci\b|adni|oasis|apoe/i.test(schema.originalQuery);
     const isRetinopathyQuery = /retinopath|fundus|ophthalm/i.test(schema.originalQuery);
     const isVehicleQuery = /vehicle|traffic|yolo/i.test(schema.originalQuery);
-    const isSkinQuery = /skin|melanoma|lesion|isic|dermoscop/i.test(schema.originalQuery);
+    const isSkinQuery = /skin|melanoma|dermoscop|isic|skin\s*lesion/i.test(schema.originalQuery);
     const isAudioQuery = /speech\s*emotion|audio\s*classif|sound\s*classif|acoustic|asr|speech.to.text|\bspeech\b.*(?:recogni|detect)|\baudio\b/i.test(schema.originalQuery);
     const isChestXRayQuery = /chest\s*x.ray|chest\s*xr|pulmonary|pneumonia|pneumothorax|lung\s*(nodule|cancer|mass|ct|segment|classif)/i.test(schema.originalQuery);
     const isNucleiQuery = /nuclei|monuseg|stardist|histolog|fluorescence\s*microscopy|digital\s*pathology|h&e|haematoxylin/i.test(schema.originalQuery);
@@ -278,6 +280,16 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
             : { gpu_recommendation: 'NVIDIA RTX 4080 (16GB) or RTX 3080 (10GB)', vram_estimate: '8-16 GB VRAM', training_time_estimate: '~4-8 hours', cost_estimate: '$8 - $20' };
     }
 
+    // Ensure user hardware constraints override fallbacks
+    const vramMatch = schema.originalQuery.match(/\b(\d+)\s*(?:gb|g)\s*(?:gpu|vram)?\b/i);
+    if (vramMatch) {
+        hardware = {
+            gpu_recommendation: `User constrained to ${vramMatch[1]} GB VRAM limit`,
+            vram_estimate: `Max ${vramMatch[1]} GB VRAM`,
+            training_time_estimate: hardware.training_time_estimate || 'Depends on batch size',
+            cost_estimate: hardware.cost_estimate || 'Local / Consumer GPU'
+        };
+    }
 
     const feasibility = {
         status: 'Technically Feasible with Specialized Architecture',
@@ -364,6 +376,18 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
         searchDiagnostics: {
             providersUsed: ['Kaggle', 'Hugging Face', 'PubMed', 'OpenAlex', 'Semantic Scholar', 'arXiv'],
             queriesExecuted: expanded.allQueries.length,
+            
+            // Phase 20: Detailed Breakdown
+            dataset_candidates_retrieved: rawPools.datasets.length,
+            model_candidates_retrieved: rawPools.models.length,
+            paper_candidates_retrieved: rawPools.papers.length,
+            
+            dataset_filter_rejected: dedupedDatasets.length - passedDatasets.length,
+            model_filter_rejected: dedupedModels.length - passedModels.length,
+            
+            dataset_final: rankedDatasets.length,
+            model_final: rankedModels.length,
+            
             candidatesRetrieved: totalRetrieved,
             candidatesAfterDeduplication: totalDeduped,
             candidatesAfterFiltering: totalAfterFiltering,
@@ -371,6 +395,12 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
             exactMatches: exactMatchesCount,
             partialMatches: partialMatchesCount,
             latencyMs,
+            sourceDistribution: rawPools.sourceCounts,
+            rejectionReasons: allRejected.map(r => ({
+                id: (r.candidate as any)?.id || 'unknown',
+                title: r.candidate.title || r.candidate.name,
+                reason: r.reason
+            })).slice(0, 50)
         },
         searchEngineVersion: SEARCH_ENGINE_VERSION,
         // Confidence status for the result set

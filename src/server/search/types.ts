@@ -445,6 +445,15 @@ export interface ResearchSearchResponse {
     searchDiagnostics: {
         providersUsed: string[];
         queriesExecuted: number;
+
+        dataset_candidates_retrieved?: number;
+        model_candidates_retrieved?: number;
+        paper_candidates_retrieved?: number;
+        dataset_filter_rejected?: number;
+        model_filter_rejected?: number;
+        dataset_final?: number;
+        model_final?: number;
+
         candidatesRetrieved: number;
         candidatesAfterDeduplication: number;
         candidatesAfterFiltering: number;
@@ -452,6 +461,8 @@ export interface ResearchSearchResponse {
         exactMatches: number;
         partialMatches: number;
         latencyMs: number;
+        sourceDistribution?: Record<string, number>;
+        rejectionReasons?: { id: string; title: string; reason: string }[];
     };
     searchEngineVersion: string;
     confidenceStatus?: string;
