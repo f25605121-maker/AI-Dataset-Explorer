@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Hybrid Retrieval & Dynamic Query-Adaptive Scoring Engine (Search Engine 2.0.0)
  *
  * Implements Section 10, 11, 23:
@@ -283,7 +283,8 @@ export function scoreCandidate(
     const hasLicense = Boolean(candidate.license && candidate.license !== 'unknown');
     const hasFormats = formats.length > 0;
     const metadataScore = Math.round(((hasDesc ? 40 : 10) + (hasLicense ? 35 : 10) + (hasFormats ? 25 : 10)));
-    const isPublicOpen = !candidate.license?.toLowerCase().includes('restricted');
+    const licenseStr = typeof candidate.license === 'string' ? candidate.license : (Array.isArray(candidate.license) ? candidate.license.join(' ') : String(candidate.license || ''));
+    const isPublicOpen = !licenseStr.toLowerCase().includes('restricted');
     const accessibilityScore = isPublicOpen ? 95 : 45;
 
     // Popularity score (strictly capped)

@@ -39,7 +39,7 @@ export function extractExplicitModality(
     if (/\b(?:x[- ]?ray|radiograph|radiography|\bcxr\b)\b/i.test(combined)) {
         return 'X-ray';
     }
-    if (/\b(?:ultrasound|sonograph|sonography|echocardiogram|echocardiography|\bus\b)\b/i.test(combined)) {
+    if (/\b(?:ultrasound|sonograph|sonography|echocardiogram|echocardiography)\b/i.test(combined)) {
         return 'Ultrasound';
     }
     if (/\b(?:histopatholog|patholog|whole\s*slide|wsi|h&e|biopsy)\b/i.test(combined)) {
