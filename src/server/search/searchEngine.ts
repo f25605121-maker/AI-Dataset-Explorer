@@ -26,9 +26,10 @@
 import {
     ResearchQuerySchema,
     ResearchSearchResponse,
+    StructuredQueryUnderstanding,
+    ProblemProfile,
     RankedResult,
     RejectedResult,
-    NormalizedSearchResult,
     UnifiedCandidate,
     SearchResult,
     SearchDiagnostics,
@@ -38,7 +39,7 @@ import { parseResearchQuery, understandQuery } from './queryUnderstanding';
 import { expandQueries } from './queryExpansion';
 import { retrieveAllCandidates } from './providers';
 import { deduplicateCandidates } from './deduplication';
-import { applyHardConstraints } from './hardConstraints';
+import { verifyCandidate } from './verification';
 import { rerankCandidates, rerankCandidatesWithConfidence } from './reranker';
 import { buildResearchGraph } from './ranking';
 import { getCachedSearch, setCachedSearch, SEARCH_ENGINE_VERSION } from './cache';
@@ -79,10 +80,29 @@ export async function advancedResearchSearch(
     const dedupedPapers = deduplicateCandidates(rawPools.papers);
     const totalDeduped = dedupedDatasets.length + dedupedModels.length + dedupedPapers.length;
 
-    // ── STAGE 6: Hard Constraints & Contradiction Filtering ───────────────────
-    const filteredDatasets = applyHardConstraints(dedupedDatasets, schema);
-    const filteredModels = applyHardConstraints(dedupedModels, schema);
-    const filteredPapers = applyHardConstraints(dedupedPapers, schema);
+    function filterWithVerification<T extends UnifiedCandidate>(candidates: T[], profile: ProblemProfile) {
+        const passed: T[] = [];
+        const rejected: RejectedResult[] = [];
+        for (const cand of candidates) {
+            const result = verifyCandidate(cand, profile);
+            if (!result.passed) {
+                rejected.push({
+                    candidate: cand as any,
+                    reason: result.failed.map(f => f.explanation).join(' | '),
+                    conflictType: 'other'
+                });
+            } else {
+                cand.requirementMatches = [...result.verified, ...result.unknown, ...result.failed];
+                passed.push(cand);
+            }
+        }
+        return { passed, rejected };
+    }
+
+    // 🚀 STAGE 6: Hard Constraints & Verification 🚀
+    const filteredDatasets = filterWithVerification(dedupedDatasets, schema);
+    const filteredModels = filterWithVerification(dedupedModels, schema);
+    const filteredPapers = filterWithVerification(dedupedPapers, schema);
 
     const allRejected: RejectedResult[] = [
         ...filteredDatasets.rejected,
@@ -365,13 +385,19 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
     };
 
 
+    const getEmptyStatus = (retrievedCount: number, filteredCount: number, name: string) => {
+        if (retrievedCount === 0) return { status: 'NO_CANDIDATES_RETRIEVED' as const, message: `No ${name} found for this query.` };
+        if (filteredCount === 0) return { status: 'CANDIDATES_FILTERED_OUT' as const, message: `Found ${retrievedCount} ${name}, but none passed the strict compatibility verification.` };
+        return null;
+    };
+
     const response: ResearchSearchResponse = {
         query,
         interpretation: schema,
-        datasets: rankedDatasets,
-        models: rankedModels,
-        papers: rankedPapers,
-        benchmarks: benchmarkCandidates,
+        datasets: rankedDatasets.length > 0 ? rankedDatasets : getEmptyStatus(rawPools.datasets.length, rankedDatasets.length, 'datasets')!,
+        models: rankedModels.length > 0 ? rankedModels : getEmptyStatus(rawPools.models.length, rankedModels.length, 'models')!,
+        papers: rankedPapers.length > 0 ? rankedPapers : getEmptyStatus(rawPools.papers.length, rankedPapers.length, 'papers')!,
+        benchmarks: benchmarkCandidates.length > 0 ? benchmarkCandidates : getEmptyStatus(0, 0, 'benchmarks')!,
         rejectedResults: allRejected.slice(0, 30),
         searchDiagnostics: {
             providersUsed: ['Kaggle', 'Hugging Face', 'PubMed', 'OpenAlex', 'Semantic Scholar', 'arXiv'],

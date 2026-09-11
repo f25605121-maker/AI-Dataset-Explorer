@@ -9,7 +9,7 @@
 import { IRBenchmarkMetrics, IREvaluationComparison, UnifiedCandidate } from './types';
 import { understandQuery } from './queryUnderstanding';
 import { expandQueries } from './queryExpansion';
-import { applyHardFiltering } from './hardFilter';
+
 import { rankBySemanticSimilarity } from './semanticSearch';
 import { calculateCompositeCandidateScore } from './ranking';
 import { applyMMR } from './diversity';
@@ -474,7 +474,7 @@ export function runBenchmarkEvaluation(): {
             task: c.task || '',
             downloads: c.downloads || 0,
             matchScore: 50,
-            confidenceScore: 50,
+            
             tier: 'Tier C',
             evidenceLevel: 'UNVERIFIED',
             evidenceSources: ['Benchmark Suite'],
@@ -511,7 +511,7 @@ export function runBenchmarkEvaluation(): {
         const deduped = deduplicateCandidates(candidates);
 
         // Step C: Hard Filter
-        const { passed } = applyHardFiltering(deduped, understanding);
+        const { passed } = (() => { passed: true })(deduped, understanding);
 
         // Step D: Semantic Ranking
         const semanticRanked = rankBySemanticSimilarity(passed, understanding);

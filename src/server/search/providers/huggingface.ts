@@ -88,7 +88,7 @@ export async function fetchHuggingFaceDatasets(
                         cardData: item.cardData,
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['Hugging Face API'],
@@ -196,7 +196,7 @@ export async function fetchHuggingFaceModels(
                         framework: item.library_name || 'PyTorch',
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['Hugging Face Hub'],

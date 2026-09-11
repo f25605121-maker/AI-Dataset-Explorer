@@ -471,13 +471,37 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         ? [...excludedDomains, ...excludedAnatomy]
         : undefined;
 
+    const tasksList = [...reconstructionTasks, ...estimationTasks, ...predictionTasks];
+    const vramMatch = q.match(/\b(\d+)\s*(?:gb|g)\s*(?:gpu|vram)?\b/i);
+    const maxVramGb = vramMatch ? parseInt(vramMatch[1], 10) : 'UNKNOWN';
+
     return {
+        // --- ProblemProfile Fields ---
+        rawQuery: q,
+        domain: primaryDomain,
+        subdomain: subDomain[0] || 'UNKNOWN',
+        tasks: tasksList, // The list of all extracted tasks
+        modalities,
+        dimensionality: dimensionality[0] || 'UNKNOWN',
+        entities: targetEntities,
+        hardwareConstraints: {
+            maxVramGb,
+            requiresEdge: /edge|mobile|jetson/i.test(q) ? true : 'UNKNOWN',
+            gpuTarget: 'UNKNOWN',
+        },
+        datasetRequirements: {
+            minimumSize: 'UNKNOWN',
+            temporalOrLongitudinal: /longitudinal|temporal|time.series/i.test(q) ? true : 'UNKNOWN',
+            labelType: 'UNKNOWN',
+        },
+        unspecifiedFields: [],
+
+        // --- Legacy Mappings ---
         originalQuery: q,
         primaryDomain,
         subDomain,
         anatomy,
         targetEntities,
-        modalities,
         modalitySubtypes,
         acquisitionTechnique,
         reconstructionTasks,
@@ -485,7 +509,6 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         estimationTasks,
         physiologicalTargets,
         samplingStrategy,
-        dimensionality,
         temporalRequirement,
         targetOutputs,
         requiredCharacteristics,
@@ -504,68 +527,38 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         labels,
         preferredSources,
         negativeConstraints,
-    };
-}
-
-// ── Backwards-Compatible Bridge Helper ────────────────────────────────────────
-
-export function understandQuery(rawQuery: string): StructuredQueryUnderstanding {
-    const parsed = parseResearchQuery(rawQuery);
-
-    const extractedAnatomy: ExtractedAnatomy = {
-        primary: parsed.anatomy.slice(0, 3),
-        organs: parsed.anatomy.slice(1, 5),
-        excluded: parsed.excludedAnatomy.slice(0, 10),
-    };
-
-    const primaryTask = parsed.reconstructionTasks[0] ? 'reconstruction'
-        : parsed.estimationTasks[0] ? 'velocity_estimation'
-        : parsed.predictionTasks[0] ? parsed.predictionTasks[0].toLowerCase()
-        : 'discovery';
-
-    const constraints: ExtractedConstraints = {
-        mustMatchAnatomy: parsed.anatomy.length > 0,
-        mustMatchModality: parsed.modalities.length > 0 && parsed.modalities[0] !== 'Multimodal / General',
-        mustMatchTask: primaryTask !== 'discovery',
-        prefer3D: parsed.dimensionality.some(d => d.includes('3D') || d.includes('4D')),
-    };
-
-    const dim: Dimensionality = parsed.dimensionality[0]?.includes('4D') ? '4D'
-        : parsed.dimensionality[0]?.includes('3D') ? '3D'
-        : 'any';
-
-    const isMed = isMedicalProblem(rawQuery) || parsed.primaryDomain.toLowerCase().includes('biomedical') || parsed.primaryDomain.toLowerCase().includes('cardiac');
-
-    return {
-        rawQuery: parsed.originalQuery,
-        domain: parsed.primaryDomain,
-        task: primaryTask,
-        taskVariants: [...parsed.reconstructionTasks, ...parsed.estimationTasks, ...parsed.predictionTasks],
-        anatomy: extractedAnatomy,
-        modality: parsed.modalities,
-        sequence: parsed.modalitySubtypes,
-        dimensionality: dim,
-        target: parsed.targetEntities,
-        annotation: parsed.targetOutputs,
+        
+        task: tasksList[0] || 'discovery',
+        taskVariants: tasksList,
+        modality: modalities,
+        sequence: modalitySubtypes,
+        target: targetEntities,
+        annotation: targetOutputs,
         pretrainedModelRequired: true,
         datasetRequired: true,
         paperRequired: true,
-        constraints,
-        positiveEntities: [...parsed.anatomy, ...parsed.modalities, ...parsed.modalitySubtypes, ...parsed.physiologicalTargets],
-        negativeEntities: parsed.excludedAnatomy,
-        requiredConstraints: parsed.requiredCharacteristics,
-        preferredConstraints: parsed.preferredCharacteristics,
+        constraints: {
+            mustMatchAnatomy: anatomy.length > 0,
+            mustMatchModality: modalities.length > 0 && modalities[0] !== 'Multimodal / General',
+            mustMatchTask: tasksList.length > 0,
+            prefer3D: dimensionality.some(d => d.includes('3D') || d.includes('4D')),
+        },
+        positiveEntities: [...anatomy, ...modalities, ...modalitySubtypes, ...physiologicalTargets],
+        negativeEntities: excludedAnatomy,
+        requiredConstraints: requiredCharacteristics,
+        preferredConstraints: preferredCharacteristics,
         softPreferences: ['Open access license', 'Verified public repository'],
         specificEntityMentioned: null,
-        parseConfidence: parsed.confidence,
+        parseConfidence: confidence,
         parseLog: [
-            `Parsed query into primary domain: ${parsed.primaryDomain}`,
-            `Anatomy detected: [${parsed.anatomy.join(', ')}]`,
-            `Modalities detected: [${parsed.modalities.join(', ')}] with subtypes [${parsed.modalitySubtypes.join(', ')}]`,
-            `Sampling detected: [${parsed.samplingStrategy.join(', ')}]`,
-            `Tasks: [${[...parsed.reconstructionTasks, ...parsed.predictionTasks].join(', ')}]`,
-            `Target entities: [${parsed.targetEntities.join(', ')}]`,
+            `Parsed query into primary domain: ${primaryDomain}`,
+            `Anatomy detected: [${anatomy.join(', ')}]`,
+            `Modalities detected: [${modalities.join(', ')}]`,
+            `Tasks: [${tasksList.join(', ')}]`,
         ],
     };
 }
 
+export function understandQuery(rawQuery: string): StructuredQueryUnderstanding {
+    return parseResearchQuery(rawQuery);
+}

@@ -167,7 +167,7 @@ export async function fetchPubMedPapers(
                         hasAbstract: Boolean(abstract.length > 50),
                     },
                     matchScore: 60,
-                    confidenceScore: 60,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['NCBI PubMed'],

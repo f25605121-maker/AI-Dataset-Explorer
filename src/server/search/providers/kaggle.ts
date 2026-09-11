@@ -45,7 +45,7 @@ export async function fetchKaggleCandidates(
                         isFeatured: true,
                     },
                     matchScore: 94,
-                    confidenceScore: 92,
+                    
                     tier: 'Tier A',
                     evidenceLevel: 'VERIFIED',
                     evidenceSources: ['Kaggle Competition & CZII Benchmark'],
@@ -136,7 +136,7 @@ export async function fetchKaggleCandidates(
                         isFeatured: item.isFeatured,
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['Kaggle API'],
@@ -183,7 +183,7 @@ export async function fetchKaggleCandidates(
                     isFeatured: true,
                 },
                 matchScore: 94,
-                confidenceScore: 92,
+                
                 tier: 'Tier A',
                 evidenceLevel: 'VERIFIED',
                 evidenceSources: ['Kaggle Competition & CZII Benchmark'],
@@ -222,7 +222,7 @@ export async function fetchKaggleCandidates(
                     isFeatured: true,
                 },
                 matchScore: 88,
-                confidenceScore: 90,
+                
                 tier: 'Tier A',
                 evidenceLevel: 'VERIFIED',
                 evidenceSources: ['EMPIAR Public Archive'],

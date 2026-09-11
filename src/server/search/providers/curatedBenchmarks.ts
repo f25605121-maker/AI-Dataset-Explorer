@@ -25,7 +25,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         task: 'progression_prediction',
         pipelineTag: 'image-classification',
         matchScore: 96,
-        confidenceScore: 98,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ["ADNI Consortium / NIH LONI / Alzheimer's & Dementia Journal"],
@@ -88,7 +88,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         modality: ['MRI', 'Tabular'],
         task: 'progression_prediction',
         matchScore: 93,
-        confidenceScore: 95,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['Washington University Knight ADRC / NIH'],
@@ -136,7 +136,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         modality: ['Image'],
         task: 'classification',
         matchScore: 95,
-        confidenceScore: 96,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['EyePACS Teleophthalmology / Aravind Eye Hospital / Kaggle'],
@@ -183,7 +183,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         modality: ['Image', 'Video'],
         task: 'segmentation',
         matchScore: 95,
-        confidenceScore: 96,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['UC Berkeley BAIR / CVPR'],
@@ -230,7 +230,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         modality: ['Image'],
         task: 'classification',
         matchScore: 96,
-        confidenceScore: 96,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['Oxford Visual Geometry Group / CVPR'],
@@ -277,7 +277,7 @@ export const CURATED_BENCHMARK_DATASETS: UnifiedCandidate[] = [
         modality: ['Microscopy'],
         task: 'segmentation',
         matchScore: 95,
-        confidenceScore: 96,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['IEEE TMI / TCGA'],
@@ -324,7 +324,7 @@ export const CURATED_BENCHMARK_MODELS: UnifiedCandidate[] = [
         architecture: '3D Swin UNETR (Hierarchical Swin Transformer)',
         pipelineTag: 'image-to-image',
         matchScore: 92,
-        confidenceScore: 94,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['MONAI Research Hub / IEEE TMI 2022'],
@@ -372,7 +372,7 @@ export const CURATED_BENCHMARK_MODELS: UnifiedCandidate[] = [
         architecture: 'TabNet (Sparsemax Attention Tabular Encoder)',
         pipelineTag: 'tabular-classification',
         matchScore: 90,
-        confidenceScore: 92,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['Google Cloud AI Research / AAAI'],
@@ -417,7 +417,7 @@ export const CURATED_BENCHMARK_MODELS: UnifiedCandidate[] = [
         architecture: 'YOLOv8-Seg (CSPDarknet + PANet + ProtoMask)',
         pipelineTag: 'image-segmentation',
         matchScore: 95,
-        confidenceScore: 98,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['Ultralytics / CVPR Workshops 2024'],
@@ -471,7 +471,7 @@ export const CURATED_BENCHMARK_PAPERS: UnifiedCandidate[] = [
         modality: ['MRI', 'Tabular'],
         task: 'progression_prediction',
         matchScore: 98,
-        confidenceScore: 98,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['IEEE TMI / PubMed PMID: 38300712'],
@@ -522,7 +522,7 @@ export const CURATED_BENCHMARK_PAPERS: UnifiedCandidate[] = [
         modality: ['Image'],
         task: 'classification',
         matchScore: 96,
-        confidenceScore: 98,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['Nature 622, 156-163 (2023)'],
@@ -571,7 +571,7 @@ export const CURATED_BENCHMARK_PAPERS: UnifiedCandidate[] = [
         modality: ['Image', 'Video'],
         task: 'segmentation',
         matchScore: 95,
-        confidenceScore: 96,
+        
         tier: 'Tier A',
         evidenceLevel: 'VERIFIED',
         evidenceSources: ['CVPR Workshops 2024'],

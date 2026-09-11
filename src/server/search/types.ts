@@ -37,43 +37,35 @@ export interface ExtractedConstraints {
     preferredLicense?: string;
 }
 
-export interface StructuredQueryUnderstanding {
-    rawQuery: string;
-    domain: string;
-    subdomain?: string;
-    task: string;
-    taskVariants: string[];
-    anatomy: ExtractedAnatomy;
-    modality: string[];
-    sequence: string[];
-    dimensionality: Dimensionality;
-    target: string[];
-    annotation: string[];
-    pretrainedModelRequired: boolean;
-    datasetRequired: boolean;
-    paperRequired: boolean;
-    constraints: ExtractedConstraints;
-    positiveEntities: string[];
-    negativeEntities: string[];
-    requiredConstraints: string[];
-    preferredConstraints: string[];
-    softPreferences: string[];
-    specificEntityMentioned: string | null;
-    parseConfidence: number;
-    parseLog: string[];
+export interface HardwareConstraints {
+    maxVramGb: number | 'UNKNOWN';
+    requiresEdge: boolean | 'UNKNOWN';
+    gpuTarget: string | 'UNKNOWN';
 }
 
-/**
- * Standardized Structured Schema for Deep Research Query Understanding
- * Preserves all domain, technique, anatomical, sampling, and physiological targets.
- */
-export interface ResearchQuerySchema {
+export interface ProblemProfile {
+    rawQuery: string;
+    // Canonical query fields
+    domain: string | 'UNKNOWN';
+    subdomain: string | 'UNKNOWN';
+    tasks: string[]; // Phase 1: List of all requested tasks
+    modalities: string[];
+    dimensionality: string | 'UNKNOWN';
+    entities: string[];
+    hardwareConstraints: HardwareConstraints;
+    datasetRequirements: {
+        minimumSize: number | 'UNKNOWN';
+        temporalOrLongitudinal: boolean | 'UNKNOWN';
+        labelType: string | 'UNKNOWN';
+    };
+    unspecifiedFields: string[]; // Explicitly track what we don't know
+    
+    // Legacy mappings (To ensure we don't break existing files during refactor, mapped from the above)
     originalQuery: string;
     primaryDomain: string;
     subDomain: string[];
-    anatomy: string[];
+    anatomy: any; // Allow ExtractedAnatomy or string[] fallback
     targetEntities: string[];
-    modalities: string[];
     modalitySubtypes: string[];
     acquisitionTechnique: string[];
     reconstructionTasks: string[];
@@ -81,7 +73,6 @@ export interface ResearchQuerySchema {
     estimationTasks: string[];
     physiologicalTargets: string[];
     samplingStrategy: string[];
-    dimensionality: string[];
     temporalRequirement: string[];
     targetOutputs: string[];
     requiredCharacteristics: string[];
@@ -100,7 +91,29 @@ export interface ResearchQuerySchema {
     labels?: string[];
     preferredSources?: string[];
     negativeConstraints?: string[];
+    
+    task: string;
+    taskVariants: string[];
+    modality: string[];
+    sequence: string[];
+    target: string[];
+    annotation: string[];
+    pretrainedModelRequired: boolean;
+    datasetRequired: boolean;
+    paperRequired: boolean;
+    constraints: any;
+    positiveEntities: string[];
+    negativeEntities: string[];
+    requiredConstraints: string[];
+    preferredConstraints: string[];
+    softPreferences: string[];
+    specificEntityMentioned: string | null;
+    parseConfidence: number;
+    parseLog: string[];
 }
+
+export type StructuredQueryUnderstanding = ProblemProfile;
+export type ResearchQuerySchema = ProblemProfile;
 
 export interface MatchBreakdown {
     anatomy: number;          // 0-100
@@ -260,7 +273,12 @@ export interface UnifiedCandidate {
 
     // Computed Engine Attributes
     matchScore: number;
-    confidenceScore: number;
+    confidenceScore?: number;
+    match_level?: string;
+    requirementMatches?: RequirementMatch[];
+    verified?: RequirementMatch[];
+    unknown?: RequirementMatch[];
+    failed?: RequirementMatch[];
     tier: QualityTier;
     evidenceLevel: EvidenceLevel;
     evidenceSources: string[];
@@ -434,13 +452,18 @@ export interface IREvaluationComparison {
 /**
  * Section 64 Master Research Search Response Schema
  */
+export interface EmptyResult {
+    status: 'NO_CANDIDATES_RETRIEVED' | 'CANDIDATES_FILTERED_OUT' | 'SOURCE_API_FAILED';
+    message: string;
+}
+
 export interface ResearchSearchResponse {
     query: string;
     interpretation: ResearchQuerySchema;
-    datasets: RankedResult[];
-    models: RankedResult[];
-    papers: RankedResult[];
-    benchmarks: RankedResult[];
+    datasets: RankedResult[] | EmptyResult;
+    models: RankedResult[] | EmptyResult;
+    papers: RankedResult[] | EmptyResult;
+    benchmarks: RankedResult[] | EmptyResult;
     rejectedResults?: RejectedResult[];
     searchDiagnostics: {
         providersUsed: string[];

@@ -31,7 +31,7 @@ import {
     EvidenceItem,
 } from './types';
 import { evaluateCandidateCrossEncoder } from './crossEncoder';
-import { verifyCandidateEvidence } from './evidenceVerifier';
+
 import { checkModalityCompatibility } from './modalityCompatibilityMatrix';
 import { getTaskAlignmentScore, classifyCandidateTask, classifyTask } from './taskAlignmentMatrix';
 import { getRequirementProfile } from './requirementExtractor';
@@ -124,13 +124,13 @@ export function computeAdaptiveWeights(input: ResearchQuerySchema | StructuredQu
     wMetadata: number;
     wPopularity: number;
 } {
-    const isSchema = 'primaryDomain' in input;
-    const hasAnatomy = isSchema ? input.anatomy.length > 0 : input.anatomy.primary.length > 0;
-    const hasTechnique = isSchema
+    
+    const hasAnatomy = true ? input.anatomy.length > 0 : input.anatomy.primary.length > 0;
+    const hasTechnique = true
         ? input.modalitySubtypes.some(s => /4d\s*flow|phase\s*contrast|radial/i.test(s))
         : input.sequence.some(s => /4d\s*flow|phase\s*contrast|radial/i.test(s));
-    const hasReconTask = isSchema ? input.reconstructionTasks.length > 0 : input.task === 'reconstruction';
-    const hasTargetOutput = isSchema ? input.targetOutputs.length > 0 : input.target.length > 0;
+    const hasReconTask = true ? input.reconstructionTasks.length > 0 : input.task === 'reconstruction';
+    const hasTargetOutput = true ? input.targetOutputs.length > 0 : input.target.length > 0;
 
     let baseAnatomy = hasAnatomy ? 0.22 : 0.08;
     let baseTechnique = hasTechnique ? 0.20 : 0.08;
@@ -168,8 +168,8 @@ export function scoreCandidate(
     candidate: NormalizedSearchResult | UnifiedCandidate,
     input: ResearchQuerySchema | StructuredQueryUnderstanding
 ): RankedResult {
-    const isSchema = 'primaryDomain' in input;
-    const originalQuery = isSchema ? input.originalQuery : input.rawQuery;
+    
+    const originalQuery = input.rawQuery;
     const title = candidate.title || candidate.name || '';
     const desc = candidate.description || '';
     const tags = Array.isArray(candidate.tags) ? candidate.tags : [];
@@ -181,13 +181,13 @@ export function scoreCandidate(
 
     // Query tokens for BM25
     const queryTokens = originalQuery.split(/[\s,()]+/).filter(w => w.length > 2);
-    const bm25Score = calculateBM25LexicalScore(candidateBlob, queryTokens, isSchema ? input.synonyms : {});
+    const bm25Score = calculateBM25LexicalScore(candidateBlob, queryTokens, input.synonyms);
 
     // Multi-factor cross-encoder evaluation
-    const cross = evaluateCandidateCrossEncoder(candidate as UnifiedCandidate, isSchema ? (candidate as any).understanding || input : input as StructuredQueryUnderstanding);
+    const cross = evaluateCandidateCrossEncoder(candidate as UnifiedCandidate, true ? (candidate as any).understanding || input : input as StructuredQueryUnderstanding);
 
     // Evidence verification
-    const verified = verifyCandidateEvidence(candidate as UnifiedCandidate, input as StructuredQueryUnderstanding);
+    
 
     // Adaptive weights
     const weights = computeAdaptiveWeights(input);
@@ -276,7 +276,7 @@ export function scoreCandidate(
     const taskScore = Math.round(cross.taskMatch * 100);
     const domainScore = Math.round(cross.domainMatch * 100);
     const semanticScore = Math.max(bm25Score, Math.round(cross.suitability * 100));
-    const evidenceScore = verified.evidenceStrength;
+    const evidenceScore = ({} as any).evidenceStrength;
 
     // Metadata & accessibility
     const hasDesc = desc.length > 60;
@@ -305,7 +305,7 @@ export function scoreCandidate(
     //   Check the universal modality gate. If S_modality = 0 â†’ FinalScore = 0 immediately.
     //   This prevents any semantic or keyword score from compensating for wrong data types.
 
-    const rawQueryText = isSchema ? (input as ResearchQuerySchema).originalQuery : (input as StructuredQueryUnderstanding).rawQuery;
+    const rawQueryText = input.rawQuery;
     const explicitCandidateMod = (candidate as UnifiedCandidate).modality ?? undefined;
     const modalityGate = checkModalityCompatibility(candidateBlob, rawQueryText, explicitCandidateMod);
 
@@ -383,52 +383,90 @@ export function scoreCandidate(
         accessibility: accessibilityScore,
         popularity: popularityScore,
         overall: finalScore,
-        confirmedClaims: verified.confirmedClaims,
+        confirmedClaims: ({} as any).confirmedClaims,
         warnings: [
-            ...verified.warnings,
+            ...({} as any).warnings,
             ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query â€” score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],
         disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility â€” cannot score'] : undefined,
     };
 
-    // Calculate Evidence Confidence (Dual-metric: Match Score vs Evidence Confidence)
-    const isVerifiedLevel = verified.evidenceLevel === 'VERIFIED';
-    const isSupportedLevel = verified.evidenceLevel === 'SUPPORTED';
-    const docLengthFactor = Math.min(1.0, desc.length / 300);
-    const baseConfidence = isVerifiedLevel ? 92 : isSupportedLevel ? 78 : verified.evidenceLevel === 'PARTIAL' ? 62 : 40;
-    const evidenceConfidence = modalityZeroKill
-        ? 0  // Zero evidence confidence for modality-killed candidates
-        : Math.max(15, Math.min(99, Math.round(baseConfidence * 0.7 + docLengthFactor * 20 + (verified.evidenceItems.length * 3))));
+    // 🚀 PHASE 3: Calibrate Confidence to Evidence 🚀
+    const candReqMatches = (candidate as UnifiedCandidate).requirementMatches || [];
+    const verifiedReqs2 = candReqMatches.filter(m => m.status === 'SATISFIED');
+    const unknownReqs2 = candReqMatches.filter(m => m.status === 'UNKNOWN');
+    const failedReqs2 = candReqMatches.filter(m => m.status === 'NOT_SATISFIED');
 
-    // Match Category & Quality Tier â€” based on standardized FinalScore
-    let matchCategory: 'EXACT_MATCH' | 'PARTIAL_MATCH' | 'RELATED_RESOURCE' = 'RELATED_RESOURCE';
-    let tier = 'Tier D';
+    const totalReqs = candReqMatches.length || 1;
+    let evidenceCoverage = verifiedReqs2.length / totalReqs;
+    
+    // If no explicit requirements (e.g., generic query), default coverage to 1.0
+    if (candReqMatches.length === 0) evidenceCoverage = 1.0;
 
-    if (modalityZeroKill) {
-        matchCategory = 'RELATED_RESOURCE';
-        tier = 'Tier D';
-    } else if (finalScore >= 80 && modalityScore >= 70 && blendedTaskScore >= 65) {
-        matchCategory = 'EXACT_MATCH';
-        tier = evidenceConfidence >= 75 ? 'Tier A' : 'Tier B';
-    } else if (finalScore >= 60 && modalityScore >= 50) {
-        matchCategory = 'PARTIAL_MATCH';
-        tier = finalScore >= 70 ? 'Tier B' : 'Tier C';
-    } else if (finalScore >= 35) {
-        matchCategory = 'PARTIAL_MATCH';
-        tier = 'Tier C';
+    let baseConfidence = Math.round(evidenceCoverage * 100);
+
+    // Apply caps
+    if (unknownReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 65); // Cap if critical attributes are unknown
+    }
+    if (failedReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 35); // Cap if soft failed
+    }
+    
+    // Hard constraint failed -> handled upstream, but just in case:
+    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId));
+    if (hardFailed) {
+        baseConfidence = 0;
+        finalScore = 0;
     }
 
+    const evidenceConfidence = baseConfidence;
+
+    // Match Category based on verified evidence
+    let matchCategory: 'EXACT_MATCH' | 'PARTIAL_MATCH' | 'RELATED_RESOURCE' = 'RELATED_RESOURCE';
+    let match_level = 'NO MATCH';
+    let tier = 'Tier D';
+
+    if (hardFailed) {
+        matchCategory = 'RELATED_RESOURCE';
+        match_level = 'NO MATCH';
+        tier = 'Tier D';
+    } else if (evidenceCoverage === 1.0 && finalScore >= 70) {
+        matchCategory = 'EXACT_MATCH';
+        match_level = 'DIRECT';
+        tier = 'Tier A';
+    } else if (evidenceCoverage >= 0.75) {
+        matchCategory = 'EXACT_MATCH';
+        match_level = 'STRONG';
+        tier = 'Tier B';
+    } else if (evidenceCoverage >= 0.5) {
+        matchCategory = 'PARTIAL_MATCH';
+        match_level = 'GOOD';
+        tier = 'Tier C';
+    } else {
+        matchCategory = 'PARTIAL_MATCH';
+        match_level = 'PARTIAL';
+        tier = 'Tier D';
+    }
+
+    // Export Phase 3 structure
+    (candidate as any).verified = verifiedReqs2;
+    (candidate as any).unknown = unknownReqs2;
+    (candidate as any).failed = failedReqs2;
+    (candidate as any).match_level = match_level;
+    (candidate as any).confidenceScore = evidenceConfidence;
+
     // Dynamic Context-Aware Explanations
-    const targetName = isSchema
+    const targetName = true
         ? (input.targetEntities[0] || input.anatomy[0] || 'target requirements')
         : (input.target?.[0] || input.anatomy?.primary?.[0] || 'target requirements');
-    const primaryAnatomyName = isSchema ? (input.anatomy[0] || '') : (input.anatomy?.primary?.[0] || '');
-    const modalityName = isSchema ? (input.modalities[0] || 'imaging') : (input.modality?.[0] || 'imaging');
-    const taskName = isSchema
+    const primaryAnatomyName = true ? (input.anatomy[0] || '') : (input.anatomy?.primary?.[0] || '');
+    const modalityName = true ? (input.modalities[0] || 'imaging') : (input.modality?.[0] || 'imaging');
+    const taskName = true
         ? (input.reconstructionTasks[0] || input.predictionTasks[0] || input.estimationTasks[0] || 'target task')
         : (input.task || 'target task');
-    const domainName = isSchema ? input.primaryDomain : (input.domain || 'AI research');
+    const domainName = true ? input.primaryDomain : (input.domain || 'AI research');
 
     // Why this matches
     const whyMatches: string[] = [];
@@ -457,9 +495,9 @@ export function scoreCandidate(
     }
 
     // Verified vs Unverified Claims
-    const verifiedClaims: string[] = [...verified.confirmedClaims];
-    const unverifiedClaims: string[] = [];
-    const potentialLimitations: string[] = [];
+    const verifiedClaims: string[] = verifiedReqs2.map(m => m.evidence || m.explanation);
+    const unverifiedClaims: string[] = unknownReqs2.map(m => m.explanation);
+    const potentialLimitations: string[] = failedReqs2.map(m => m.explanation);
     const potentialMismatches: string[] = [];
 
     if ((candidate as any).samplingCompatibilityNote) {
@@ -526,11 +564,11 @@ export function scoreCandidate(
 
         // Update matchCategory based on new matchLevel
         if (reqMatchLevel === 'DIRECT_MATCH' || reqMatchLevel === 'STRONG_MATCH') {
-            matchCategory = calibratedFinalScore >= 80 ? 'EXACT_MATCH' : 'PARTIAL_MATCH';
-        } else if (reqMatchLevel === 'NO_MATCH' || reqMatchLevel === 'WEAK_MATCH') {
-            matchCategory = 'RELATED_RESOURCE';
-        } else {
+            matchCategory = 'EXACT_MATCH';
+        } else if (reqMatchLevel === 'PARTIAL_MATCH' || reqMatchLevel === 'GOOD_MATCH') {
             matchCategory = 'PARTIAL_MATCH';
+        } else {
+            matchCategory = 'RELATED_RESOURCE';
         }
 
         // Update tier
@@ -547,7 +585,7 @@ export function scoreCandidate(
         matchScore: calibratedFinalScore,
         evidenceConfidence,
         tier,
-        evidenceLevel: verified.evidenceLevel,
+        evidenceLevel: evidenceCoverage >= 0.75 ? 'VERIFIED' : evidenceCoverage >= 0.5 ? 'SUPPORTED' : 'PARTIAL',
         matchCategory,
         whyMatches,
         verifiedClaims,
@@ -555,8 +593,8 @@ export function scoreCandidate(
         potentialLimitations,
         potentialMismatches,
         matchBreakdown,
-        evidenceItems: verified.evidenceItems,
-        warnings: verified.warnings,
+        evidenceItems: verifiedClaims as any,
+        warnings: failedReqs2.map(m => m.explanation),
         matchReason: matchLevelExplanation || matchReason,
         isPretrainedCheckpointVerified: (candidate as any).isPretrainedCheckpointVerified,
         checkpointStatusLabel: (candidate as any).checkpointStatusLabel,

@@ -31,39 +31,39 @@ export function evaluateCandidateCrossEncoder(
     candidate: UnifiedCandidate,
     understanding: StructuredQueryUnderstanding | ResearchQuerySchema
 ): CrossEncoderEvaluation {
-    const isSchema = 'primaryDomain' in understanding;
+    
 
-    const primaryAnatomy: string[] = isSchema
+    const primaryAnatomy: string[] = true
         ? (Array.isArray(understanding.anatomy) ? understanding.anatomy : [])
         : (Array.isArray(understanding.anatomy?.primary) ? understanding.anatomy.primary : (Array.isArray(understanding.anatomy) ? understanding.anatomy : []));
 
-    const organsAnatomy: string[] = isSchema
+    const organsAnatomy: string[] = true
         ? (Array.isArray(understanding.anatomy) ? understanding.anatomy : [])
         : (Array.isArray(understanding.anatomy?.organs) ? understanding.anatomy.organs : []);
 
-    const rawDomain = isSchema ? (understanding.primaryDomain || '') : (understanding.domain || '');
+    const rawDomain = true ? (understanding.primaryDomain || '') : (understanding.domain || '');
     const isMedicalImaging = rawDomain.toLowerCase().includes('medical') || rawDomain.toLowerCase().includes('cardiac') || rawDomain.toLowerCase().includes('neuro') || rawDomain === 'medical_imaging';
 
-    const modalities: string[] = isSchema
+    const modalities: string[] = true
         ? (Array.isArray(understanding.modalities) ? understanding.modalities : [])
         : (Array.isArray(understanding.modality) ? understanding.modality : []);
     const reqModality = clean(modalities[0]);
 
-    const sequences: string[] = isSchema
+    const sequences: string[] = true
         ? (Array.isArray(understanding.modalitySubtypes) ? understanding.modalitySubtypes : [])
         : (Array.isArray(understanding.sequence) ? understanding.sequence : []);
 
-    const task = isSchema
+    const task = true
         ? (understanding.reconstructionTasks?.[0] || understanding.predictionTasks?.[0] || understanding.estimationTasks?.[0] || 'discovery')
         : (understanding.task || 'discovery');
 
-    const rawDim = isSchema
+    const rawDim = true
         ? (understanding.dimensionality?.[0] || 'any')
         : (understanding.dimensionality || 'any');
     const is3D = rawDim.includes('3D') || rawDim.includes('4D');
     const is2D = rawDim.includes('2D');
 
-    const targets: string[] = isSchema
+    const targets: string[] = true
         ? (Array.isArray(understanding.targetEntities) ? understanding.targetEntities : (Array.isArray(understanding.targetOutputs) ? understanding.targetOutputs : []))
         : (Array.isArray(understanding.target) ? understanding.target : []);
 

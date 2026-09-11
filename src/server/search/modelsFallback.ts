@@ -40,7 +40,7 @@ export function getFallbackBaselineModels(
             architecture: 'End-to-End Variational Network (VarNet / Complex U-Net)',
             pipelineTag: 'image-to-image',
             matchScore: 82,
-            confidenceScore: 78,
+            
             tier: 'Tier B',
             evidenceLevel: 'PARTIAL',
             evidenceSources: ['FastMRI Research Benchmark / Meta AI & NYU Langone Health'],
@@ -118,7 +118,7 @@ export function getFallbackBaselineModels(
             architecture: '4DFlowNet (Residual Physics-Informed CNN)',
             pipelineTag: 'image-to-image',
             matchScore: 86,
-            confidenceScore: 82,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['Frontiers in Physics 2020 / 4DFlowNet Open Repository'],
@@ -197,7 +197,7 @@ export function getFallbackBaselineModels(
             architecture: '3D Swin UNETR (Hierarchical Vision Transformer)',
             pipelineTag: 'image-segmentation',
             matchScore: 88,
-            confidenceScore: 92,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['MONAI Research Hub / IEEE TMI 2022'],
@@ -262,7 +262,7 @@ export function getFallbackBaselineModels(
             architecture: 'SAM-Med3D (3D Promptable Vision Transformer)',
             pipelineTag: 'image-segmentation',
             matchScore: 84,
-            confidenceScore: 88,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['Meta AI / arXiv:2310.15142'],
@@ -315,7 +315,7 @@ export function getFallbackBaselineModels(
             architecture: 'BiomedCLIP (ViT-Base + PubMedBERT)',
             pipelineTag: 'zero-shot-image-classification',
             matchScore: 82,
-            confidenceScore: 88,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['Microsoft Research'],
@@ -354,7 +354,7 @@ export function getFallbackBaselineModels(
             architecture: 'Encoder-Decoder Audio Transformer',
             pipelineTag: 'automatic-speech-recognition',
             matchScore: 85,
-            confidenceScore: 95,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['OpenAI'],
@@ -393,7 +393,7 @@ export function getFallbackBaselineModels(
             architecture: 'Chronos T5 Tabular Transformer',
             pipelineTag: 'tabular-classification',
             matchScore: 80,
-            confidenceScore: 85,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['Amazon Science'],
@@ -432,7 +432,7 @@ export function getFallbackBaselineModels(
             architecture: 'Vision Transformer (ViT-Base)',
             pipelineTag: 'image-classification',
             matchScore: 82,
-            confidenceScore: 90,
+            
             tier: 'Tier B',
             evidenceLevel: 'SUPPORTED',
             evidenceSources: ['Google Research'],

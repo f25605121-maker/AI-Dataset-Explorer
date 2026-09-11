@@ -73,7 +73,7 @@ export async function fetchOpenAlexPapers(
                         is_oa: item.open_access?.is_oa,
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['OpenAlex'],

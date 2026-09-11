@@ -34,21 +34,21 @@ export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
             : fastApiRes.closest_alternatives || [];
         if (recommendedDatasets.length) {
             datasets.push(...recommendedDatasets.map((d: any) => ({
-                ...d, type: 'dataset', url: d.url || d.canonical_url || '#', matchScore: d.score ?? 0, confidenceScore: d.score ?? 0,
+                ...d, type: 'dataset', url: d.url || d.canonical_url || '#', matchScore: d.score ?? 0, 
                 evidenceLevel: d.score >= 85 ? 'VERIFIED' : 'HIGH_RELEVANCE', evidenceSources: [d.source || 'huggingface'],
                 whyMatches: d.why, warnings: d.warnings, matchReason: (d.why && d.why[0]) || 'Aligned with target task and modality.',
             })));
         }
         if (fastApiRes.models) {
             models.push(...fastApiRes.models.map((m: any) => ({
-                ...m, type: 'model', url: m.url || m.canonical_url || '#', matchScore: m.score ?? 0, confidenceScore: m.score ?? 0,
+                ...m, type: 'model', url: m.url || m.canonical_url || '#', matchScore: m.score ?? 0, 
                 evidenceLevel: 'VERIFIED', whyMatches: m.why, warnings: m.warnings,
                 matchReason: (m.why && m.why[0]) || 'Compatible model architecture for problem.',
             })));
         }
         const allPapers = [...(fastApiRes.papers || []), ...(fastApiRes.latest_research || [])];
         papers.push(...allPapers.map((p: any) => ({
-            ...p, type: 'paper', matchScore: p.score, confidenceScore: p.score,
+            ...p, type: 'paper', matchScore: p.score, 
             evidenceLevel: 'PEER_REVIEWED', relationship: p.paper_type === 'DATASET_SPECIFIC' ? 'EXACT_DATASET' : p.paper_type === 'MODEL_SPECIFIC' ? 'EXACT_MODEL' : 'DIRECTLY_RELATED',
             matchReason: (p.why && p.why[0]) || 'Scientific literature directly investigating target methodology.',
         })));
@@ -60,13 +60,13 @@ export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
         const existingModelIds = new Set(models.map(m => m.id));
         const existingPaperIds = new Set(papers.map(p => p.id));
 
-        for (const d of (res.datasets || [])) {
+        for (const d of (Array.isArray(res.datasets) ? res.datasets : [])) {
             if (!existingDatasetIds.has(d.id)) datasets.push(d as unknown as UnifiedCandidate);
         }
-        for (const m of (res.models || [])) {
+        for (const m of (Array.isArray(res.models) ? res.models : [])) {
             if (!existingModelIds.has(m.id)) models.push(m as unknown as UnifiedCandidate);
         }
-        for (const p of (res.papers || [])) {
+        for (const p of (Array.isArray(res.papers) ? res.papers : [])) {
             if (!existingPaperIds.has(p.id)) papers.push(p as unknown as UnifiedCandidate);
         }
 

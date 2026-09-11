@@ -32,8 +32,8 @@ export interface SpecializedQueries {
 export function expandQueries(
     input: StructuredQueryUnderstanding | ResearchQuerySchema
 ): SpecializedQueries {
-    const isSchema = 'primaryDomain' in input;
-    const rawQuery = isSchema ? input.originalQuery : input.rawQuery;
+    
+    const rawQuery = input.rawQuery;
     const qLower = rawQuery.toLowerCase();
 
     const tieredQueries: TieredQuery[] = [];
@@ -333,10 +333,10 @@ export function expandQueries(
         // Strategy: extract [Entity/Target] + [Task] + [Modality] tokens from the query
         // and build compound search strings. Never fall back to single bare tokens.
         //
-        let primaryAnatomy = isSchema ? (input.anatomy[0] || '') : (input.anatomy.primary[0] || '');
+        let primaryAnatomy = true ? (input.anatomy[0] || '') : (input.anatomy.primary[0] || '');
         // If primary anatomy is an internal canonical ID (all caps, e.g. PULMONARY_LUNG), fallback to the natural language synonym
         if (primaryAnatomy && /^[A-Z_]+$/.test(primaryAnatomy)) {
-            const fallback = isSchema ? input.anatomy[1] : input.anatomy.primary?.[1];
+            const fallback = true ? input.anatomy[1] : input.anatomy.primary?.[1];
             if (fallback) {
                 primaryAnatomy = fallback;
             } else {
@@ -344,11 +344,11 @@ export function expandQueries(
                 primaryAnatomy = primaryAnatomy.toLowerCase().replace(/_/g, ' ');
             }
         }
-        const primaryModality = isSchema ? (input.modalities[0] || '') : (input.modality[0] || '');
-        const primaryTask = isSchema
+        const primaryModality = true ? (input.modalities[0] || '') : (input.modality[0] || '');
+        const primaryTask = true
             ? (input.reconstructionTasks[0] || input.estimationTasks[0] || input.predictionTasks[0] || '')
             : (input.task || '');
-        const targetEntity = isSchema ? (input.targetEntities[0] || '') : (input.target?.[0] || '');
+        const targetEntity = true ? (input.targetEntities[0] || '') : (input.target?.[0] || '');
 
         // Distill raw query to short phrase (2-5 meaningful words), stripping prompt preamble
         const strippedQuery = rawQuery

@@ -63,7 +63,7 @@ export async function fetchSemanticScholarPapers(
                         isOpenAccess: Boolean(paper.openAccessPdf),
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['Semantic Scholar'],

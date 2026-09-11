@@ -90,7 +90,7 @@ export async function fetchArxivPapers(
                         arxivId,
                     },
                     matchScore: 50,
-                    confidenceScore: 50,
+                    
                     tier: 'Tier C',
                     evidenceLevel: 'UNVERIFIED',
                     evidenceSources: ['arXiv'],
