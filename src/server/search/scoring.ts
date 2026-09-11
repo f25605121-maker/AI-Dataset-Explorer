@@ -283,7 +283,7 @@ export function scoreCandidate(
     const hasLicense = Boolean(candidate.license && candidate.license !== 'unknown');
     const hasFormats = formats.length > 0;
     const metadataScore = Math.round(((hasDesc ? 40 : 10) + (hasLicense ? 35 : 10) + (hasFormats ? 25 : 10)));
-    const licenseStr = typeof candidate.license === 'string' ? candidate.license : (Array.isArray(candidate.license) ? candidate.license.join(' ') : String(candidate.license || ''));
+    const licenseStr = typeof candidate.license === 'string' ? candidate.license : (Array.isArray(candidate.license) ? (candidate.license as any).join(' ') : String(candidate.license || ''));
     const isPublicOpen = !licenseStr.toLowerCase().includes('restricted');
     const accessibilityScore = isPublicOpen ? 95 : 45;
 

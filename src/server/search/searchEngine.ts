@@ -398,7 +398,7 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
             sourceDistribution: rawPools.sourceCounts,
             rejectionReasons: allRejected.map(r => ({
                 id: (r.candidate as any)?.id || 'unknown',
-                title: r.candidate.title || r.candidate.name,
+                title: r.candidate.title || (r.candidate as any)?.name || 'Unknown',
                 reason: r.reason
             })).slice(0, 50)
         },
