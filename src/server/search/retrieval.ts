@@ -13,6 +13,7 @@ import {
 } from './types';
 import { advancedResearchSearch } from './searchEngine';
 import { queryFastApiRecommend } from './fastapiClient';
+import { getFallbackBaselineModels } from './modelsFallback';
 
 export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
     // Run both pipelines concurrently for speed and merge them
@@ -26,18 +27,21 @@ export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
     const papers: UnifiedCandidate[] = [];
 
     let prof = {};
-    if (fastApiRes && !fastApiRes.no_direct_match) {
+    if (fastApiRes) {
         prof = fastApiRes.problem_profile || {};
-        if (fastApiRes.datasets) {
-            datasets.push(...fastApiRes.datasets.map((d: any) => ({
-                ...d, type: 'dataset', matchScore: d.score, confidenceScore: d.score,
+        const recommendedDatasets = fastApiRes.datasets?.length
+            ? fastApiRes.datasets
+            : fastApiRes.closest_alternatives || [];
+        if (recommendedDatasets.length) {
+            datasets.push(...recommendedDatasets.map((d: any) => ({
+                ...d, type: 'dataset', url: d.url || d.canonical_url || '#', matchScore: d.score ?? 0, confidenceScore: d.score ?? 0,
                 evidenceLevel: d.score >= 85 ? 'VERIFIED' : 'HIGH_RELEVANCE', evidenceSources: [d.source || 'huggingface'],
                 whyMatches: d.why, warnings: d.warnings, matchReason: (d.why && d.why[0]) || 'Aligned with target task and modality.',
             })));
         }
         if (fastApiRes.models) {
             models.push(...fastApiRes.models.map((m: any) => ({
-                ...m, type: 'model', matchScore: m.score, confidenceScore: m.score,
+                ...m, type: 'model', url: m.url || m.canonical_url || '#', matchScore: m.score ?? 0, confidenceScore: m.score ?? 0,
                 evidenceLevel: 'VERIFIED', whyMatches: m.why, warnings: m.warnings,
                 matchReason: (m.why && m.why[0]) || 'Compatible model architecture for problem.',
             })));
@@ -64,6 +68,36 @@ export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
         }
         for (const p of (res.papers || [])) {
             if (!existingPaperIds.has(p.id)) papers.push(p as unknown as UnifiedCandidate);
+        }
+
+        // The strict filter can reject every dataset even when the provider found
+        // useful near-matches. Keep those visible as partial alternatives.
+        if (datasets.length === 0) {
+            for (const rejected of (res.rejectedResults || [])) {
+                const candidate = rejected.candidate as any;
+                if (candidate?.type !== 'dataset' || !candidate.id || existingDatasetIds.has(candidate.id)) continue;
+                datasets.push({
+                    ...candidate,
+                    type: 'dataset',
+                    url: candidate.url || candidate.canonical_url || '#',
+                    matchScore: Math.max(20, candidate.matchScore ?? 20),
+                    confidenceScore: candidate.confidenceScore ?? 20,
+                    tier: 'Tier D',
+                    matchCategory: 'PARTIAL_MATCH',
+                    evidenceLevel: 'PARTIAL',
+                    rejected: true,
+                    rejectionReason: rejected.reason,
+                    matchReason: `Closest available alternative: ${rejected.reason}`,
+                } as UnifiedCandidate);
+                existingDatasetIds.add(candidate.id);
+                if (datasets.length >= 5) break;
+            }
+        }
+
+        // Keep model discovery useful when the live FastAPI service is unavailable
+        // or strict compatibility filtering removes all public checkpoints.
+        if (models.length === 0 && res.diagnostics?.parsedQuery) {
+            models.push(...getFallbackBaselineModels(res.diagnostics.parsedQuery as any));
         }
     }
 
