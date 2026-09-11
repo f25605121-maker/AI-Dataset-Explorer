@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hugging Face Provider Adapter
  *
  * Fetches and normalizes Datasets and Pretrained Models from Hugging Face Hub APIs.
@@ -125,7 +125,7 @@ export async function fetchHuggingFaceModels(
     const headers = getHfHeaders();
 
     // Determine HF pipeline_tag from the query's extracted task for precision filtering.
-    // Uses the task alignment matrix to map canonical task → HF API taxonomy.
+    // Uses the task alignment matrix to map canonical task â†’ HF API taxonomy.
     const queryTaskText = `${understanding.rawQuery} ${understanding.task || ''}`;
     const canonicalTask = classifyTask(queryTaskText);
     const hfPipelineTag = canonicalTask !== 'DISCOVERY' ? canonicalTaskToHFPipelineTag(canonicalTask) : null;

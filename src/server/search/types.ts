@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Search Engine Unified Types & Schemas
  *
  * Core data contracts for the Evidence-Aware AI Research Retrieval and Recommendation Engine.
@@ -517,9 +517,9 @@ export interface ResearchSearchResponse {
     aiRationale?: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // REQUIREMENT-AWARE CONFIDENCE SYSTEM TYPES
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type RequirementCategory =
     | 'DOMAIN' | 'MODALITY' | 'TASK' | 'TARGET' | 'LONGITUDINAL'
@@ -532,7 +532,7 @@ export type RequirementImportance = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type RequirementSatisfaction =
     | 'SATISFIED' | 'PARTIAL' | 'NOT_SATISFIED' | 'UNKNOWN' | 'CONFLICT';
 
-/** Five-level match categorization — replaces the binary EXACT/PARTIAL label */
+/** Five-level match categorization â€” replaces the binary EXACT/PARTIAL label */
 export type MatchLevel =
     | 'DIRECT_MATCH' | 'STRONG_MATCH' | 'PARTIAL_MATCH' | 'WEAK_MATCH' | 'NO_MATCH';
 
@@ -543,7 +543,7 @@ export interface Requirement {
     importance: RequirementImportance;
     isHard: boolean;                   // hard = violation caps final score
     detectedValue: string;             // what was parsed from the query
-    weight: number;                    // 0–1, weights sum to 1.0 across all reqs
+    weight: number;                    // 0â€“1, weights sum to 1.0 across all reqs
     confidence?: number;
     source?: 'explicit' | 'inferred' | 'metadata' | 'llm' | 'user-provided';
 }
@@ -552,7 +552,7 @@ export interface RequirementMatch {
     requirementId: string;
     status: RequirementSatisfaction;
     evidence: string | null;           // text snippet from candidate metadata
-    confidence: number;                // 0–1
+    confidence: number;                // 0â€“1
     explanation: string;               // one-line reason
 }
 
@@ -581,11 +581,11 @@ export interface RequirementProfile {
 }
 
 export interface CalibratedScore {
-    finalScore: number;                // 0–100 after calibration + caps
+    finalScore: number;                // 0â€“100 after calibration + caps
     matchLevel: MatchLevel;
-    requirementCoverage: number;       // 0–100 weighted coverage
-    hardConstraintScore: number;       // 0–100 (0 = critical violation present)
-    technicalCompatibility: number;    // 0–100 (especially for models)
+    requirementCoverage: number;       // 0â€“100 weighted coverage
+    hardConstraintScore: number;       // 0â€“100 (0 = critical violation present)
+    technicalCompatibility: number;    // 0â€“100 (especially for models)
     matchLevelExplanation: string;     // one-line human reason
     cappedBy: string | null;           // which cap rule triggered (null = no cap)
     scoringTrace: {

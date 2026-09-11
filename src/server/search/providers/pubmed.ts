@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PubMed Provider Adapter (Search Engine 2.0.0)
  *
  * Fetches and normalizes biomedical peer-reviewed papers from NCBI E-Utilities API.

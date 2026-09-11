@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Master Research Search Engine Orchestrator (Search Engine 2.0.0)
  *
  * Implements Section 16 & Section 64:
@@ -53,7 +53,7 @@ export async function advancedResearchSearch(
     const query = rawQuery.trim();
     const t0 = Date.now();
 
-    // ── STAGE 16: Cache Check ─────────────────────────────────────────────────
+    // â”€â”€ STAGE 16: Cache Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!options?.bypassCache) {
         const cached = getCachedSearch(query, { bypassCache: options?.bypassCache });
         if (cached) {
@@ -61,18 +61,18 @@ export async function advancedResearchSearch(
         }
     }
 
-    // ── STAGE 1-2: Deep Query Understanding ───────────────────────────────────
+    // â”€â”€ STAGE 1-2: Deep Query Understanding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const schema: ResearchQuerySchema = parseResearchQuery(query);
     const understanding = understandQuery(query);
 
-    // ── STAGE 3: Multi-Tier Query Expansion ───────────────────────────────────
+    // â”€â”€ STAGE 3: Multi-Tier Query Expansion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const expanded = expandQueries(schema);
 
-    // ── STAGE 4: Concurrent Multi-Source Retrieval ────────────────────────────
+    // â”€â”€ STAGE 4: Concurrent Multi-Source Retrieval â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const rawPools = await retrieveAllCandidates(expanded, understanding);
     const totalRetrieved = rawPools.allCandidates.length;
 
-    // ── STAGE 5: Cross-Source Deduplication ───────────────────────────────────
+    // â”€â”€ STAGE 5: Cross-Source Deduplication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
     const dedupedDatasets = deduplicateCandidates(rawPools.datasets);
@@ -99,7 +99,7 @@ export async function advancedResearchSearch(
         return { passed, rejected };
     }
 
-    // 🚀 STAGE 6: Hard Constraints & Verification 🚀
+    // ðŸš€ STAGE 6: Hard Constraints & Verification ðŸš€
     const filteredDatasets = filterWithVerification(dedupedDatasets, schema);
     const filteredModels = filterWithVerification(dedupedModels, schema);
     const filteredPapers = filterWithVerification(dedupedPapers, schema);
@@ -119,7 +119,7 @@ export async function advancedResearchSearch(
 
     const totalAfterFiltering = passedDatasets.length + passedModels.length + passedPapers.length;
 
-    // 🔬 STAGE 7-11: Scoring, Re-ranking, Evidence & Confidence Calibration 🔬
+    // ðŸ”¬ STAGE 7-11: Scoring, Re-ranking, Evidence & Confidence Calibration ðŸ”¬
     // Uses the standardized 4-factor formula with zero-multiplier rule.
     // After scoring, evaluates result-set confidence status.
     const datasetRerankResult = rerankCandidatesWithConfidence(passedDatasets, schema, 25);
@@ -150,7 +150,7 @@ export async function advancedResearchSearch(
         ...rankedPapers.filter(p => /challenge|benchmark|evaluation/i.test(p.title)),
     ].slice(0, 10);
 
-    // ── STAGE 14: Cross-Entity Research Graph Linkage ─────────────────────────
+    // â”€â”€ STAGE 14: Cross-Entity Research Graph Linkage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const allRankedUnified: UnifiedCandidate[] = [
         ...(rankedDatasets as unknown as UnifiedCandidate[]),
         ...(rankedModels as unknown as UnifiedCandidate[]),
@@ -178,7 +178,7 @@ export async function advancedResearchSearch(
         }
     }
 
-    // ── STAGE 13: Scientific Synthesis & Hardware Feasibility ─────────────────
+    // â”€â”€ STAGE 13: Scientific Synthesis & Hardware Feasibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const isCardiacRecon = schema.primaryDomain.toLowerCase().includes('cardiovascular') &&
         schema.reconstructionTasks.length > 0;
     const isAlzheimerQuery = /alzheimer|dementia|mild\s*cognitive|\bmci\b|adni|oasis|apoe/i.test(schema.originalQuery);
@@ -205,7 +205,7 @@ export async function advancedResearchSearch(
         scientificSynthesis = `Cardiac 4D Flow MRI reconstruction requires mapping 3-directional blood velocity vectors over the cardiac cycle from raw k-space. Under sparse radial undersampling, sub-Nyquist non-Cartesian trajectories require adjoint Non-Uniform FFT (NUFFT) operators combined with physics-informed variational networks or deep residual networks (e.g. 4DFlowNet). Estimating hemodynamic wall shear stress (WSS) necessitates computing spatial velocity gradients near vessel walls, sensitive to high-frequency reconstruction artifacts.`;
         hardware = { gpu_recommendation: 'NVIDIA A100 (80GB) or RTX 4090 (24GB)', vram_estimate: '18-24 GB VRAM for 4D spatiotemporal volumetric batches', training_time_estimate: '~14 hours on 4x A100 for 4DFlowNet super-resolution', cost_estimate: '$25 - $45 on cloud GPU cluster' };
     } else if (isAlzheimerQuery) {
-        scientificSynthesis = `Longitudinal modeling of Alzheimer's disease progression requires fusing 3D volumetric structural brain MRI (tracking hippocampal atrophy and ventricular enlargement) with multimodal clinical records (MMSE, CDR-SB), demographic features, and genetic biomarkers (APOE ε4 allele status). Recommended architectures leverage 3D vision backbones (Swin UNETR, DenseNet-121 3D) combined with attention-based tabular encoders (TabNet) or cross-attention multimodal transformers capable of handling missing longitudinal timepoints.`;
+        scientificSynthesis = `Longitudinal modeling of Alzheimer's disease progression requires fusing 3D volumetric structural brain MRI (tracking hippocampal atrophy and ventricular enlargement) with multimodal clinical records (MMSE, CDR-SB), demographic features, and genetic biomarkers (APOE Îµ4 allele status). Recommended architectures leverage 3D vision backbones (Swin UNETR, DenseNet-121 3D) combined with attention-based tabular encoders (TabNet) or cross-attention multimodal transformers capable of handling missing longitudinal timepoints.`;
         hardware = { gpu_recommendation: 'NVIDIA RTX 4090 (24GB) or RTX 3090 (24GB)', vram_estimate: '14-18 GB VRAM for 3D volumetric batches (patch-based)', training_time_estimate: '~6-10 hours for multimodal fusion network', cost_estimate: '$12 - $25 on single cloud GPU' };
     } else if (isRetinopathyQuery) {
         scientificSynthesis = `Automated grading of diabetic retinopathy relies on high-resolution retinal fundus photography to detect microaneurysms, hemorrhages, hard exudates, and cotton wool spots. Transfer learning from foundation vision backbones (e.g. BiomedCLIP, RetFound, ConvNeXt) fine-tuned with ordinal cross-entropy or kappa-weighted loss provides state-of-the-art multi-class diagnostic performance.`;
@@ -235,10 +235,10 @@ export async function advancedResearchSearch(
         scientificSynthesis = `Driver fatigue and drowsiness detection systems analyze facial action units (eye closure rate PERCLOS, blink frequency, yawn detection) from dashboard camera video streams. Lightweight temporal CNN-LSTM or transformer-based architectures (e.g. VideoMAE fine-tuned on driver datasets) achieve real-time inference at 30+ FPS. The YawDD and NTHU Drowsy Driver datasets are standard benchmarks for model evaluation.`;
         hardware = { gpu_recommendation: 'NVIDIA RTX 3070 (8GB) or Jetson AGX Orin (edge)', vram_estimate: '4-8 GB VRAM', training_time_estimate: '~2-5 hours', cost_estimate: '$3 - $10' };
     } else if (isKeypointQuery) {
-        scientificSynthesis = `Human pose estimation extracts 2D/3D skeletal keypoint coordinates from images or video for downstream action recognition, sports analytics, and physical rehabilitation. Top-down (detect person → localize keypoints) pipelines using HRNet, ViTPose, or RTMPose on COCO-Keypoints and MPII achieve state-of-the-art mAP. Bottom-up approaches (OpenPose, EfficientDet-Pose) enable faster multi-person inference.`;
+        scientificSynthesis = `Human pose estimation extracts 2D/3D skeletal keypoint coordinates from images or video for downstream action recognition, sports analytics, and physical rehabilitation. Top-down (detect person â†’ localize keypoints) pipelines using HRNet, ViTPose, or RTMPose on COCO-Keypoints and MPII achieve state-of-the-art mAP. Bottom-up approaches (OpenPose, EfficientDet-Pose) enable faster multi-person inference.`;
         hardware = { gpu_recommendation: 'NVIDIA RTX 3080 (10GB) or RTX 4070 (12GB)', vram_estimate: '6-12 GB VRAM', training_time_estimate: '~4-8 hours', cost_estimate: '$5 - $15' };
     } else if (isSatelliteQuery) {
-        scientificSynthesis = `Remote sensing and satellite imagery analysis requires handling multi-spectral, hyperspectral, and SAR modalities with spatial resolutions from sub-meter (Pléiades) to 10m (Sentinel-2). Standard tasks include land cover classification (LoveDA, BigEarthNet), change detection, and object detection in aerial imagery (DOTA, xView). Recommended architectures: SegFormer or SatMAE pre-trained with self-supervised masked image modelling on large-scale satellite archives, fine-tuned for downstream geospatial tasks.`;
+        scientificSynthesis = `Remote sensing and satellite imagery analysis requires handling multi-spectral, hyperspectral, and SAR modalities with spatial resolutions from sub-meter (PlÃ©iades) to 10m (Sentinel-2). Standard tasks include land cover classification (LoveDA, BigEarthNet), change detection, and object detection in aerial imagery (DOTA, xView). Recommended architectures: SegFormer or SatMAE pre-trained with self-supervised masked image modelling on large-scale satellite archives, fine-tuned for downstream geospatial tasks.`;
         hardware = { gpu_recommendation: 'NVIDIA RTX 4080 (16GB) or A100 (40GB)', vram_estimate: '12-20 GB VRAM', training_time_estimate: '~6-12 hours', cost_estimate: '$10 - $25' };
     } else if (isNLPQuery) {
         scientificSynthesis = `NLP tasks (sentiment analysis, NER, QA, text classification) are best addressed with pre-trained transformer language models fine-tuned on task-specific labeled data. BERT-base/large, RoBERTa, DistilBERT, or domain-specific variants (BioBERT for clinical text, LegalBERT) achieve state-of-the-art performance with minimal task-specific labeled data (typically 1k-10k examples). For multilingual tasks, mBERT or XLM-RoBERTa provide robust cross-lingual transfer.`;
@@ -253,7 +253,7 @@ export async function advancedResearchSearch(
         scientificSynthesis = `Real-time seizure detection from intracranial EEG (iEEG) and scalp EEG requires temporal-spectral feature extraction over multi-channel electrode arrays. Leading approaches use 1D CNNs or bi-directional LSTM/GRU networks on sliding short-time windows (1-4 seconds) of band-power features (delta, theta, alpha, beta, gamma). For onset zone localization, Graph Neural Networks (GNNs) on electrode connectivity graphs capture spatial propagation patterns. Recommended datasets: CHB-MIT Scalp EEG, Bonn EEG, Temple University Hospital EEG Corpus.`;
         hardware = { gpu_recommendation: 'NVIDIA RTX 3080 (10GB) or RTX 4070 (12GB)', vram_estimate: '6-10 GB VRAM', training_time_estimate: '~3-6 hours', cost_estimate: '$5 - $12' };
     } else {
-        // ── LLM-Powered Dynamic Synthesis for Unrecognized Domains ───────────────
+        // â”€â”€ LLM-Powered Dynamic Synthesis for Unrecognized Domains â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Build a concise context from top results to ground the synthesis in real data
         const topTitles = [
             ...rankedDatasets.slice(0, 3).map(d => d.title),
@@ -323,7 +323,7 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
     const exactMatchesCount = [...rankedDatasets, ...rankedModels, ...rankedPapers].filter(r => r.matchCategory === 'EXACT_MATCH').length;
     const partialMatchesCount = [...rankedDatasets, ...rankedModels, ...rankedPapers].filter(r => r.matchCategory === 'PARTIAL_MATCH').length;
 
-    // ── STAGE 17: Telemetry & Diagnostics ─────────────────────────────────────
+    // â”€â”€ STAGE 17: Telemetry & Diagnostics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const latencyMs = Date.now() - t0;
 
     const sourceDistribution: Record<string, number> = {};
@@ -448,7 +448,7 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
         scientificSynthesis,
     };
 
-    // ── STAGE 16: Cache Result ────────────────────────────────────────────────
+    // â”€â”€ STAGE 16: Cache Result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     setCachedSearch(query, response, 60, SEARCH_ENGINE_VERSION);
 
     return response;

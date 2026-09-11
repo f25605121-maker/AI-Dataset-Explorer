@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kaggle Provider Adapter
  *
  * Fetches and normalizes dataset candidates from the Kaggle API into standard UnifiedCandidate format.

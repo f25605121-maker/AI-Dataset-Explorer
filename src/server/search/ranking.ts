@@ -26,7 +26,7 @@ export function calculateCompositeCandidateScore(
     const cross = evaluateCandidateCrossEncoder(candidate, understanding);
 
     // Step 2: Evidence Verification & Claim Extraction
-    const verified = (() => ({} as any))(candidate, understanding);
+    const verified = ({} as any);
 
     // Step 3: Metadata & Accessibility
     const hasDesc = (candidate.description?.length || 0) > 60;

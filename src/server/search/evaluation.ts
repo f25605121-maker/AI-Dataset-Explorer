@@ -474,7 +474,7 @@ export function runBenchmarkEvaluation(): {
             task: c.task || '',
             downloads: c.downloads || 0,
             matchScore: 50,
-            
+            confidenceScore: 50,
             tier: 'Tier C',
             evidenceLevel: 'UNVERIFIED',
             evidenceSources: ['Benchmark Suite'],
@@ -511,7 +511,7 @@ export function runBenchmarkEvaluation(): {
         const deduped = deduplicateCandidates(candidates);
 
         // Step C: Hard Filter
-        const { passed } = (() => { passed: true })(deduped, understanding);
+        const { passed } = ({ passed: deduped });
 
         // Step D: Semantic Ranking
         const semanticRanked = rankBySemanticSimilarity(passed, understanding);

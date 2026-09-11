@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hybrid Retrieval & Dynamic Query-Adaptive Scoring Engine (Search Engine 2.0.0)
  *
  * Implements Section 10, 11, 23:
@@ -10,14 +10,14 @@
  * 6. Match breakdown and transparent explanation generator
  *
  * COMPOSITE SCORING FORMULA (Standardized 4-Factor):
- *   FinalScore = (w_m Â· S_modality) + (w_t Â· S_task) + (w_d Â· S_domain) + (w_s Â· S_semantic)
+ *   FinalScore = (w_m Ã‚Â· S_modality) + (w_t Ã‚Â· S_task) + (w_d Ã‚Â· S_domain) + (w_s Ã‚Â· S_semantic)
  *   w_m=0.35, w_t=0.30, w_d=0.20, w_s=0.15
  *
  * ZERO-MULTIPLIER RULE:
- *   If S_modality = 0 â†’ FinalScore = 0. Modality gate output feeds directly into this formula.
+ *   If S_modality = 0 Ã¢â€ â€™ FinalScore = 0. Modality gate output feeds directly into this formula.
  *
  * CONFIDENCE THRESHOLDING:
- *   If max(FinalScore) across result set < 60 â†’ status = 'PARTIAL_OR_LOW_CONFIDENCE'.
+ *   If max(FinalScore) across result set < 60 Ã¢â€ â€™ status = 'PARTIAL_OR_LOW_CONFIDENCE'.
  *   No candidate may be badged "Top Match" or assigned ">80% Compatible" in this state.
  */
 
@@ -38,7 +38,7 @@ import { getRequirementProfile } from './requirementExtractor';
 import { matchCandidateRequirements, computeRequirementCoverage, computeHardConstraintScore } from './requirementMatcher';
 import { calibrateScore, categorizeRequirements } from './confidenceCalibrator';
 
-/** Confidence status for a result set â€” evaluated after all candidates are scored. */
+/** Confidence status for a result set Ã¢â‚¬â€ evaluated after all candidates are scored. */
 export type ConfidenceStatus = 'HIGH_CONFIDENCE' | 'PARTIAL_OR_LOW_CONFIDENCE';
 
 /** Minimum FinalScore for any candidate to be considered high-confidence. */
@@ -293,16 +293,16 @@ export function scoreCandidate(
     const citations = candidate.citationCount || 0;
     const popularityScore = Math.min(100, downloads > 10000 || likes > 500 || citations > 200 ? 100 : downloads > 1000 || citations > 20 ? 60 : 30);
 
-    // â”€â”€ STANDARDIZED 4-FACTOR COMPOSITE FORMULA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Ã¢â€â‚¬Ã¢â€â‚¬ STANDARDIZED 4-FACTOR COMPOSITE FORMULA Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     //
-    //   FinalScore = (w_m Â· S_modality) + (w_t Â· S_task) + (w_d Â· S_domain) + (w_s Â· S_semantic)
+    //   FinalScore = (w_m Ã‚Â· S_modality) + (w_t Ã‚Â· S_task) + (w_d Ã‚Â· S_domain) + (w_s Ã‚Â· S_semantic)
     //   w_m=0.35, w_t=0.30, w_d=0.20, w_s=0.15
     //
     // For medical/biomedical queries, S_domain incorporates anatomy + technique + dimension.
     // For non-medical queries, S_domain = domainScore.
     //
     // ZERO-MULTIPLIER RULE:
-    //   Check the universal modality gate. If S_modality = 0 â†’ FinalScore = 0 immediately.
+    //   Check the universal modality gate. If S_modality = 0 Ã¢â€ â€™ FinalScore = 0 immediately.
     //   This prevents any semantic or keyword score from compensating for wrong data types.
 
     const rawQueryText = input.rawQuery;
@@ -386,13 +386,13 @@ export function scoreCandidate(
         confirmedClaims: ({} as any).confirmedClaims,
         warnings: [
             ...({} as any).warnings,
-            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query â€” score forced to 0'] : []),
+            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€ score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],
-        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility â€” cannot score'] : undefined,
+        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility Ã¢â‚¬â€ cannot score'] : undefined,
     };
 
-    // 🚀 PHASE 3: Calibrate Confidence to Evidence 🚀
+    // ðŸš€ PHASE 3: Calibrate Confidence to Evidence ðŸš€
     const candReqMatches = (candidate as UnifiedCandidate).requirementMatches || [];
     const verifiedReqs2 = candReqMatches.filter(m => m.status === 'SATISFIED');
     const unknownReqs2 = candReqMatches.filter(m => m.status === 'UNKNOWN');
@@ -514,7 +514,7 @@ export function scoreCandidate(
 
     const cleanTarget = targetName.replace(/['"]/g, '');
     const matchReason = modalityZeroKill
-        ? `Rejected: Modality incompatibility — ${modalityGate.candidateModalityGroup} vs ${modalityGate.queryModalityGroup}.`
+        ? `Rejected: Modality incompatibility â€” ${modalityGate.candidateModalityGroup} vs ${modalityGate.queryModalityGroup}.`
         : matchCategory === 'EXACT_MATCH'
         ? `Verified exact match: ${title} directly matches ${cleanTarget} criteria.`
         : matchCategory === 'PARTIAL_MATCH'
@@ -525,7 +525,7 @@ export function scoreCandidate(
         ? candidate.modality
         : (candidate.modality ? [candidate.modality] : []);
 
-    // ── REQUIREMENT-AWARE CALIBRATION ────────────────────────────────────────
+    // â”€â”€ REQUIREMENT-AWARE CALIBRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Extracts requirements from query, matches candidate, applies caps.
     // This replaces finalScore with a requirement-coverage-dominant score.
     const requirementProfile = getRequirementProfile(rawQueryText);
@@ -577,7 +577,7 @@ export function scoreCandidate(
         else if (calibratedFinalScore >= 50) tier = 'Tier C';
         else tier = 'Tier D';
     }
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const ranked: RankedResult = {
         ...candidate,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Query Expansion & Decomposition Engine (Search Engine 2.0.0)
  *
  * Implements Section 7 & 8: Tiered Retrieval and Targeted Query Families.
@@ -72,7 +72,7 @@ export function expandQueries(
     const isKeypoint = /keypoint|pose\s*estimat|skeleton\s*detect|human\s*pose|body\s*landmark/i.test(qLower);
 
 
-    // ΓöÇΓöÇ 1. Target Problem: 4D Flow Cardiac MRI Velocity & WSS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // Î“Ã¶Ã‡Î“Ã¶Ã‡ 1. Target Problem: 4D Flow Cardiac MRI Velocity & WSS Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
     if (is4DFlowCardiac) {
         // TIER 1: Exact Specialized Queries
         addQuery('4D flow cardiac MRI radial undersampling', 1, 'dataset');
@@ -230,7 +230,7 @@ export function expandQueries(
         addQuery('skin cancer classification', 4, 'dataset');
 
     } else if (isAudioEmotion) {
-        // ΓöÇΓöÇ Audio: Speech Emotion Recognition ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Audio: Speech Emotion Recognition Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         // TIER 1: Exact compound [Entity]+[Task]+[Modality]
         addQuery('speech emotion recognition audio dataset', 1, 'dataset');
         addQuery('emotion recognition speech wav dataset', 1, 'dataset');
@@ -256,7 +256,7 @@ export function expandQueries(
         addQuery('emotion speech audio', 4, 'dataset');
 
     } else if (isASR) {
-        // ΓöÇΓöÇ Audio: Automatic Speech Recognition ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Audio: Automatic Speech Recognition Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         addQuery('automatic speech recognition dataset', 1, 'dataset');
         addQuery('ASR speech transcription corpus audio', 1, 'dataset');
         addQuery('whisper speech recognition model', 1, 'model');
@@ -267,7 +267,7 @@ export function expandQueries(
         addQuery('speech recognition audio corpus', 3, 'dataset');
 
     } else if (isAudioClassification) {
-        // ΓöÇΓöÇ Audio: Acoustic Event Detection / Sound Classification ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Audio: Acoustic Event Detection / Sound Classification Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         addQuery('acoustic event detection audio dataset', 1, 'dataset');
         addQuery('sound event detection audio classification dataset', 1, 'dataset');
         addQuery('audio classification sound events', 1, 'dataset');
@@ -279,7 +279,7 @@ export function expandQueries(
         addQuery('audio sound classification dataset', 3, 'dataset');
 
     } else if (isCoronarySegmentation && !is4DFlowCardiac) {
-        // ΓöÇΓöÇ Medical: Coronary Artery CT/CTA Segmentation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Medical: Coronary Artery CT/CTA Segmentation Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         // TIER 1: Exact compound [Anatomy]+[Task]+[Modality]
         addQuery('coronary artery CT segmentation dataset', 1, 'dataset');
         addQuery('coronary artery segmentation CTA dataset', 1, 'dataset');
@@ -298,7 +298,7 @@ export function expandQueries(
         addQuery('vascular segmentation CT deep learning', 3, 'paper');
 
     } else if (isDriverFatigue) {
-        // ΓöÇΓöÇ Automotive/Video: Driver Fatigue & Drowsiness Detection ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Automotive/Video: Driver Fatigue & Drowsiness Detection Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         // TIER 1: Exact compound [Entity]+[Task]+[Modality]
         addQuery('driver fatigue detection video dataset', 1, 'dataset');
         addQuery('drowsiness detection driver monitoring video', 1, 'dataset');
@@ -317,7 +317,7 @@ export function expandQueries(
         addQuery('fatigue detection driving video deep learning', 3, 'paper');
 
     } else if (isKeypoint) {
-        // ΓöÇΓöÇ Vision: Human Pose / Keypoint Estimation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Vision: Human Pose / Keypoint Estimation Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         addQuery('human pose estimation keypoint dataset', 1, 'dataset');
         addQuery('body keypoint detection benchmark', 1, 'dataset');
         addQuery('pose estimation model keypoint detection', 1, 'model');
@@ -328,7 +328,7 @@ export function expandQueries(
         addQuery('keypoint detection pose estimation', 3, 'dataset');
 
     } else {
-        // ΓöÇΓöÇ Generic: Compound Multi-Token Query Generation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Î“Ã¶Ã‡Î“Ã¶Ã‡ Generic: Compound Multi-Token Query Generation Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
         //
         // Strategy: extract [Entity/Target] + [Task] + [Modality] tokens from the query
         // and build compound search strings. Never fall back to single bare tokens.

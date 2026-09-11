@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Requirement Matcher
  *
  * For every candidate, evaluates each requirement in the RequirementProfile and
@@ -46,7 +46,7 @@ function matchGenericRequirement(candidate: UnifiedCandidate, req: RequirementPr
     return { requirementId: req.id, status: 'UNKNOWN', evidence: null, confidence: 0, explanation: 'Requirement is not specified in available resource metadata' };
 }
 
-// -- Domain matching ------------------------------------------------------------
+// ── Domain matching ────────────────────────────────────────────────────────────
 
 interface DomainMatcher {
     domainId: string;
@@ -180,7 +180,7 @@ function matchDomain(blob: string, title: string, reqId: string): RequirementMat
     };
 }
 
-// -- Known model VRAM requirements --------------------------------------------
+// ── Known model VRAM requirements ────────────────────────────────────────────
 
 interface ModelVramEstimate {
     pattern: RegExp;
@@ -220,7 +220,7 @@ function estimateModelVram(blob: string, candidate: UnifiedCandidate): { estimat
     return { estimatedGb: null, note: "VRAM unknown", patchFeasible: true };
 }
 
-// -- Main requirement matcher --------------------------------------------------
+// ── Main requirement matcher ──────────────────────────────────────────────────
 
 export function matchCandidateRequirements(
     candidate: UnifiedCandidate,
@@ -235,13 +235,13 @@ export function matchCandidateRequirements(
         let m: RequirementMatch;
 
         switch (req.category) {
-            // -- Domain --------------------------------------------------------
+            // ── Domain ────────────────────────────────────────────────────────
             case "DOMAIN": {
                 m = matchDomain(blob, title, req.id);
                 break;
             }
 
-            // -- Modality -----------------------------------------------------
+            // ── Modality ─────────────────────────────────────────────────────
             case "MODALITY": {
                 const vals = req.detectedValue.toLowerCase().split(",").map((v) => v.trim());
                 const primary = vals[0];
@@ -308,7 +308,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- Task ---------------------------------------------------------
+            // ── Task ─────────────────────────────────────────────────────────
             case "TASK": {
                 const tasks = req.detectedValue.split(",").map((t) => t.trim().toLowerCase());
                 let matched = 0;
@@ -331,7 +331,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- Longitudinal -------------------------------------------------
+            // ── Longitudinal ─────────────────────────────────────────────────
             case "LONGITUDINAL": {
                 const hasLong = /longitudinal|multi.?timepoint|follow.?up|visit|timepoint|serial\s*scan|repeat\s*scan|progression.*scan|longitudinal\s*cohort/i.test(blob);
                 const inTitle = /longitudinal|follow.?up|multi.?time/i.test(title);
@@ -349,7 +349,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- Multimodal ----------------------------------------------------
+            // ── Multimodal ────────────────────────────────────────────────────
             case "MULTIMODAL": {
                 const hasImaging = /\bct\b|\bmri\b|imaging|scan|x.?ray/i.test(blob);
                 const hasClinical = /clinical|tabular|ehr|demographic|biomarker|lab|spirometry/i.test(blob);
@@ -376,7 +376,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- Clinical ------------------------------------------------------
+            // ── Clinical ──────────────────────────────────────────────────────
             case "CLINICAL": {
                 const hasClinical = /clinical|tabular|ehr|demographic|biomarker|lab\s*value|spirometry|questionnaire|patient\s*record/i.test(blob);
                 m = {
@@ -391,7 +391,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- Target / Outcome ----------------------------------------------
+            // ── Target / Outcome ──────────────────────────────────────────────
             case "TARGET": {
                 const targets = req.detectedValue.split(";").map((t) => t.trim().toLowerCase());
                 let satisfied = 0;
@@ -414,7 +414,7 @@ export function matchCandidateRequirements(
                 break;
             }
 
-            // -- GPU / VRAM -----------------------------------------------------
+            // ── GPU / VRAM ─────────────────────────────────────────────────────
             case "GPU": {
                 if (candidate.type !== "model") {
                     m = { requirementId: req.id, status: "UNKNOWN", evidence: null, confidence: 0, explanation: "GPU requirement only applies to models" };
@@ -425,7 +425,7 @@ export function matchCandidateRequirements(
                 if (estimatedGb === null) {
                     m = { requirementId: req.id, status: "UNKNOWN", evidence: null, confidence: 0, explanation: `VRAM requirements unknown (${note})` };
                 } else if (estimatedGb <= limitGb) {
-                    m = { requirementId: req.id, status: "SATISFIED", evidence: note, confidence: 0.8, explanation: `Estimated ${estimatedGb}GB VRAM = ${limitGb}GB limit` };
+                    m = { requirementId: req.id, status: "SATISFIED", evidence: note, confidence: 0.8, explanation: `Estimated ${estimatedGb}GB VRAM ≤ ${limitGb}GB limit` };
                 } else if (patchFeasible && estimatedGb <= limitGb * 2) {
                     m = {
                         requirementId: req.id,
@@ -440,13 +440,13 @@ export function matchCandidateRequirements(
                         status: "NOT_SATISFIED",
                         evidence: note,
                         confidence: 0.9,
-                        explanation: `Model requires ~${estimatedGb}GB VRAM � exceeds ${limitGb}GB limit even with optimization`,
+                        explanation: `Model requires ~${estimatedGb}GB VRAM — exceeds ${limitGb}GB limit even with optimization`,
                     };
                 }
                 break;
             }
 
-            // -- Class imbalance, Missing data, Pretraining, Population --------
+            // ── Class imbalance, Missing data, Pretraining, Population ────────
             case "CLASS_IMBALANCE": {
                 const has = /imbalance|imbalanced|class\s*weight|smote|oversampling|undersampling|focal\s*loss|weighted/i.test(blob);
                 m = { requirementId: req.id, status: has ? "PARTIAL" : "UNKNOWN", evidence: has ? "Imbalance handling mentioned" : null, confidence: has ? 0.55 : 0, explanation: has ? "Class imbalance handling found in description" : "Class imbalance handling not verified" };
@@ -483,7 +483,7 @@ export function matchCandidateRequirements(
 }
 
 /**
- * Compute weighted requirement coverage score (0�100).
+ * Compute weighted requirement coverage score (0–100).
  * SATISFIED = full weight, PARTIAL = 50%, NOT_SATISFIED / CONFLICT = 0%, UNKNOWN = 0%.
  */
 export function computeRequirementCoverage(
@@ -507,7 +507,7 @@ export function computeRequirementCoverage(
 }
 
 /**
- * Compute hard constraint satisfaction score (0�100).
+ * Compute hard constraint satisfaction score (0–100).
  * Returns 0 if any CRITICAL hard requirement is CONFLICT or NOT_SATISFIED.
  */
 export function computeHardConstraintScore(

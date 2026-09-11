@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Query Understanding Engine (Search Engine 2.0.0)
  *
  * Converts natural-language research problem statements into a deep, structured
@@ -30,7 +30,7 @@ import {
     getConflictingAnatomies,
 } from './ontology';
 
-// ── Scientific Domain Matchers ────────────────────────────────────────────────
+// â”€â”€ Scientific Domain Matchers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface DomainMatchRule {
     domain: string;
@@ -131,7 +131,7 @@ const DOMAIN_RULES: DomainMatchRule[] = [
     },
 ];
 
-// ── Master Query Parser (Section 4 & 5) ──────────────────────────────────────
+// â”€â”€ Master Query Parser (Section 4 & 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
     const q = rawQuery.trim();

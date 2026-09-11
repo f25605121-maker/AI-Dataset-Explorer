@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Semantic Scholar Provider Adapter
  *
  * Fetches and normalizes research paper candidates from Semantic Scholar Graph API.

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Search Engine Retrieval Adapter
  *
  * Exposes the backwards-compatible `advancedSearch` method by delegating to the

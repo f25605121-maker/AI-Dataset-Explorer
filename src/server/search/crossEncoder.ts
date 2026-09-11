@@ -31,41 +31,26 @@ export function evaluateCandidateCrossEncoder(
     candidate: UnifiedCandidate,
     understanding: StructuredQueryUnderstanding | ResearchQuerySchema
 ): CrossEncoderEvaluation {
+    const prof = understanding as any; // Bypass TS checks for legacy fields just in case
     
+    const primaryAnatomy: string[] = prof.anatomy || prof.anatomy?.primary || [];
+    const organsAnatomy: string[] = prof.anatomy || prof.anatomy?.organs || [];
 
-    const primaryAnatomy: string[] = true
-        ? (Array.isArray(understanding.anatomy) ? understanding.anatomy : [])
-        : (Array.isArray(understanding.anatomy?.primary) ? understanding.anatomy.primary : (Array.isArray(understanding.anatomy) ? understanding.anatomy : []));
-
-    const organsAnatomy: string[] = true
-        ? (Array.isArray(understanding.anatomy) ? understanding.anatomy : [])
-        : (Array.isArray(understanding.anatomy?.organs) ? understanding.anatomy.organs : []);
-
-    const rawDomain = true ? (understanding.primaryDomain || '') : (understanding.domain || '');
+    const rawDomain = prof.primaryDomain || prof.domain || '';
     const isMedicalImaging = rawDomain.toLowerCase().includes('medical') || rawDomain.toLowerCase().includes('cardiac') || rawDomain.toLowerCase().includes('neuro') || rawDomain === 'medical_imaging';
 
-    const modalities: string[] = true
-        ? (Array.isArray(understanding.modalities) ? understanding.modalities : [])
-        : (Array.isArray(understanding.modality) ? understanding.modality : []);
+    const modalities: string[] = prof.modalities || prof.modality || [];
     const reqModality = clean(modalities[0]);
 
-    const sequences: string[] = true
-        ? (Array.isArray(understanding.modalitySubtypes) ? understanding.modalitySubtypes : [])
-        : (Array.isArray(understanding.sequence) ? understanding.sequence : []);
+    const sequences: string[] = prof.modalitySubtypes || prof.sequence || [];
 
-    const task = true
-        ? (understanding.reconstructionTasks?.[0] || understanding.predictionTasks?.[0] || understanding.estimationTasks?.[0] || 'discovery')
-        : (understanding.task || 'discovery');
+    const task = prof.reconstructionTasks?.[0] || prof.predictionTasks?.[0] || prof.estimationTasks?.[0] || prof.task || 'discovery';
 
-    const rawDim = true
-        ? (understanding.dimensionality?.[0] || 'any')
-        : (understanding.dimensionality || 'any');
+    const rawDim = prof.dimensionality?.[0] || prof.dimensionality || 'any';
     const is3D = rawDim.includes('3D') || rawDim.includes('4D');
     const is2D = rawDim.includes('2D');
 
-    const targets: string[] = true
-        ? (Array.isArray(understanding.targetEntities) ? understanding.targetEntities : (Array.isArray(understanding.targetOutputs) ? understanding.targetOutputs : []))
-        : (Array.isArray(understanding.target) ? understanding.target : []);
+    const targets: string[] = prof.targetEntities || prof.targetOutputs || prof.target || [];
 
     const title = clean(candidate.title || candidate.name);
     const desc = clean(candidate.description);

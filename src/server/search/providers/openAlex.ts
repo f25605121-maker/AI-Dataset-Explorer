@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OpenAlex Provider Adapter
  *
  * Fetches and normalizes scholarly literature from OpenAlex API.
