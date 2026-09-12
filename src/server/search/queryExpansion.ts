@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Query Expansion & Decomposition Engine (Search Engine 2.0.0)
  *
  * Implements Section 7 & 8: Tiered Retrieval and Targeted Query Families.
@@ -351,14 +351,20 @@ export function expandQueries(
         const targetEntity = true ? (input.targetEntities[0] || '') : (input.target?.[0] || '');
 
         // Distill raw query to short phrase (2-5 meaningful words), stripping prompt preamble
-        const strippedQuery = rawQuery
-            .replace(/^(I am building|I need a dataset for|I need a dataset|I need a model for|I need a model|I need a|I need to|I need|We want to|Please find|Can you recommend|I have|Looking for|Search for|Find me)\s+/i, '')
+        let strippedQuery = rawQuery
+            .replace(/^(I'm building|i am building|i'm making|i need|we want to|please find|can you recommend|i have|looking for|search for|find me|i'm looking for|we're looking for|we are building|building a|creating a|need a|want a)\b\s*(?:a\s+|an\s+|the\s+|dataset for\s+|model for\s+|system to\s+|system for\s+)?/i, '')
             .trim();
-        const shortQuery = strippedQuery.split(/[\n.?,;]/)[0].trim().split(/\s+/).slice(0, 6).join(' ');
+            
+        // Additional cleanup of common filler at the start
+        strippedQuery = strippedQuery.replace(/^(system|model|dataset|project)\s+(to|for)\s+/i, '').trim();
+
+        const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models"]);
+        const shortQueryTokens = strippedQuery.split(/[\n.?,;]/)[0].trim().split(/\s+/).filter(w => !stopWords.has(w.toLowerCase()));
+        const shortQuery = shortQueryTokens.slice(0, 6).join(' ');
 
         // Build compound queries from extracted structural tokens
-        const entity = targetEntity || primaryAnatomy || shortQuery.split(/\s+/).slice(0, 2).join(' ');
-        const task = primaryTask || shortQuery.split(/\s+/).slice(-2).join(' ');
+        const entity = targetEntity || primaryAnatomy || shortQueryTokens.slice(0, 2).join(' ');
+        const task = primaryTask || shortQueryTokens.slice(-2).join(' ');
         const modality = primaryModality && primaryModality !== 'Multimodal / General' ? primaryModality : '';
 
         // TIER 1: Full compound [Entity + Task + Modality] strings

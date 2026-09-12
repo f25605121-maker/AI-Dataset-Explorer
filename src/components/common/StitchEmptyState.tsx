@@ -29,8 +29,13 @@ export function StitchEmptyState({
     /cryo|tomography|subtomogram|macromolecule/i.test(query) ||
     /cryo/i.test(modality || "");
 
-  const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models"]);
-  const queryWords = (query || "").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models", "i'm", "building", "a", "system", "to", "predict", "detect", "find", "search"]);
+  const strippedQuery = (query || "")
+    .replace(/^(I'm building|i am building|i'm making|i need|we want to|please find|can you recommend|i have|looking for|search for|find me|i'm looking for|we're looking for|we are building|building a|creating a|need a|want a)\b\s*(?:a\s+|an\s+|the\s+|dataset for\s+|model for\s+|system to\s+|system for\s+)?/i, '')
+    .replace(/^(system|model|dataset|project)\s+(to|for)\s+/i, '')
+    .trim();
+    
+  const queryWords = strippedQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
   const relaxedChips = queryWords.slice(0, 4).map(w => ({
     label: `Search '${w}'`,
     query: w

@@ -410,7 +410,10 @@ export function scoreCandidate(
 
     let baseConfidence = Math.round(evidenceCoverage * 100);
 
-    const missingCriticalReqs = failedReqs2.filter(m => m.importance === 'CRITICAL');
+    const missingCriticalReqs = failedReqs2.filter(m => {
+        const reqDef = requirementProfile.requirements.find(r => r.id === m.requirementId);
+        return reqDef?.importance === 'CRITICAL';
+    });
     if (missingCriticalReqs.length > 0) {
         baseConfidence = 0;
     } else if (failedReqs2.length > 0) {

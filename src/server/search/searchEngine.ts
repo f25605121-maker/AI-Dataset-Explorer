@@ -73,8 +73,23 @@ export async function advancedResearchSearch(
     
     // Auto-Relaxation Retry if 0 datasets retrieved
     if (rawPools.datasets.length === 0) {
-        const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models"]);
-        const fallbackWords = understanding.rawQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+        let fallbackWords: string[] = [];
+        const combined = [
+            ...(understanding.targetEntities || []),
+            ...(understanding.entities || []),
+            ...(understanding.tasks || []),
+            ...(understanding.reconstructionTasks || []),
+            ...(understanding.predictionTasks || []),
+            ...(understanding.modalities || [])
+        ];
+        if (combined.length > 0) {
+            fallbackWords = Array.from(new Set(combined)).filter(w => w.length > 2);
+        } else {
+            const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models", "i'm", "building", "a", "system", "to"]);
+            const stripped = understanding.rawQuery.replace(/^(I'm building|i am building|i'm making|i need|we want to|please find|can you recommend|i have|looking for|search for|find me|i'm looking for|we're looking for|we are building|building a|creating a|need a|want a)\b\s*(?:a\s+|an\s+|the\s+|dataset for\s+|model for\s+|system to\s+|system for\s+)?/i, '');
+            fallbackWords = stripped.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+        }
+        
         const fallbackQueries = fallbackWords.slice(0, 4);
         if (fallbackWords.length >= 2) {
             fallbackQueries.unshift(fallbackWords.slice(0, 2).join(' '));
@@ -143,8 +158,8 @@ export async function advancedResearchSearch(
     const modelRerankResult = rerankCandidatesWithConfidence(passedModels, schema, 25);
     const paperRerankResult = rerankCandidatesWithConfidence(passedPapers, schema, 30);
 
-    const rankedDatasets = datasetRerankResult.candidates;
-    const rankedModels = modelRerankResult.candidates;
+    const rankedDatasets = datasetRerankResult.candidates.filter((d: any) => d.matchScore >= 30);
+    const rankedModels = modelRerankResult.candidates.filter((m: any) => m.matchScore >= 30);
     const rankedPapers = paperRerankResult.candidates.filter((p: any) => p.matchScore >= 30);
 
     // Overall confidence = worst of the three (if any primary type is low-confidence, flag it)
