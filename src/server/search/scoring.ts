@@ -271,12 +271,51 @@ export function scoreCandidate(
         targetScore = Math.min(100, targetScore + 30);
     }
 
+    // 🚀 — PHASE 1.5: Calibrate Evidence Coverage (Requirements) — 
+    const explicitCandidateMod = (candidate as UnifiedCandidate).modality ?? undefined;
+    const modalityGate = checkModalityCompatibility(candidateBlob, originalQuery, explicitCandidateMod);
+    const modalityZeroKill = modalityGate.compatibilityScore === 0;
+
+    const requirementProfile = getRequirementProfile(originalQuery);
+    let reqMatches: any[] = [];
+    if (requirementProfile.requirements.length > 0 && !modalityZeroKill) {
+        reqMatches = matchCandidateRequirements(candidate as UnifiedCandidate, requirementProfile);
+    }
+    const candReqMatches = reqMatches.length > 0 ? reqMatches : (candidate as UnifiedCandidate).requirementMatches || [];
+    
+    const verifiedReqs2 = candReqMatches.filter(m => m.status === 'SATISFIED');
+    const unknownReqs2 = candReqMatches.filter(m => m.status === 'UNKNOWN');
+    const failedReqs2 = candReqMatches.filter(m => m.status === 'NOT_SATISFIED');
+
+    const totalReqs = candReqMatches.length || 1;
+    let evidenceCoverage = verifiedReqs2.length / totalReqs;
+    if (candReqMatches.length === 0) evidenceCoverage = 1.0;
+
+    let baseConfidence = Math.round(evidenceCoverage * 100);
+
+    const missingCriticalReqs = failedReqs2.filter(m => {
+        const reqDef = requirementProfile.requirements.find(r => r.id === m.requirementId);
+        return reqDef?.importance === 'CRITICAL';
+    });
+    if (missingCriticalReqs.length > 0) {
+        baseConfidence = 0;
+    } else if (failedReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 35);
+    } else if (unknownReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 65);
+    }
+
+    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId)) || missingCriticalReqs.length > 0;
+    if (hardFailed) {
+        baseConfidence = 0;
+    }
+
     const anatomyScore = Math.round(cross.anatomyMatch * 100);
     const modalityScore = Math.round(cross.modalityMatch * 100);
     const taskScore = Math.round(cross.taskMatch * 100);
     const domainScore = Math.round(cross.domainMatch * 100);
     const semanticScore = Math.max(bm25Score, Math.round(cross.suitability * 100));
-    const evidenceScore = ({} as any).evidenceStrength;
+    const evidenceScore = baseConfidence;
 
     // Metadata & accessibility
     const hasDesc = desc.length > 60;
@@ -293,34 +332,30 @@ export function scoreCandidate(
     const citations = candidate.citationCount || 0;
     const popularityScore = Math.min(100, downloads > 10000 || likes > 500 || citations > 200 ? 100 : downloads > 1000 || citations > 20 ? 60 : 30);
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ STANDARDIZED 4-FACTOR COMPOSITE FORMULA Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ── STANDARDIZED 4-FACTOR COMPOSITE FORMULA ──
     //
-    //   FinalScore = (w_m Ã‚Â· S_modality) + (w_t Ã‚Â· S_task) + (w_d Ã‚Â· S_domain) + (w_s Ã‚Â· S_semantic)
+    //   FinalScore = (w_m · S_modality) + (w_t · S_task) + (w_d · S_domain) + (w_s · S_semantic)
     //   w_m=0.35, w_t=0.30, w_d=0.20, w_s=0.15
     //
     // For medical/biomedical queries, S_domain incorporates anatomy + technique + dimension.
     // For non-medical queries, S_domain = domainScore.
     //
     // ZERO-MULTIPLIER RULE:
-    //   Check the universal modality gate. If S_modality = 0 Ã¢â€ â€™ FinalScore = 0 immediately.
+    //   Check the universal modality gate. If S_modality = 0 → FinalScore = 0 immediately.
     //   This prevents any semantic or keyword score from compensating for wrong data types.
 
-    const rawQueryText = input.rawQuery;
-    const explicitCandidateMod = (candidate as UnifiedCandidate).modality ?? undefined;
-    const modalityGate = checkModalityCompatibility(candidateBlob, rawQueryText, explicitCandidateMod);
-
+    // ── Phase 2: Compute S_components ──
     // Also apply task alignment from the new task matrix
     const candidateTaskText = `${(candidate as any).pipelineTag || ''} ${(candidate as any).task || ''} ${candidateBlob}`;
-    const queryTaskText = rawQueryText;
+    const queryTaskText = originalQuery;
     const taskAlignment = getTaskAlignmentScore(queryTaskText, candidateTaskText);
     // Blend cross-encoder taskScore with task alignment matrix result (cross-encoder has context from tags/desc)
     const blendedTaskScore = Math.round((taskScore * 0.5) + (taskAlignment.score * 100 * 0.5));
 
     // ZERO-MULTIPLIER: If modality gate killed it, score = 0
     let finalScore: number;
-    const modalityZeroKill = modalityGate.compatibilityScore === 0;
 
-    if (modalityZeroKill) {
+    if (modalityZeroKill || hardFailed) {
         finalScore = 0;
     } else {
         // S_modality: primary from cross-encoder modalityScore (0-100)
@@ -329,21 +364,14 @@ export function scoreCandidate(
         // S_task: blended cross-encoder + task alignment matrix (0-100)
         const S_task = blendedTaskScore;
 
-        // S_domain: incorporates anatomy/technique/dimension for medical queries (0-100)
-        // For non-medical: pure domain score
-        const hasMedicalContext = anatomyScore > 50 && (domainScore > 60 || /medical|radiol|clinical/i.test(rawQueryText));
-        const S_domain = hasMedicalContext
-            ? Math.round(
-                (anatomyScore * 0.40) +
-                (techniqueScore * 0.25) +
-                (dimensionScore * 0.15) +
-                (domainScore * 0.20)
-            )
-            : Math.round(
-                (domainScore * 0.55) +
-                (targetScore * 0.30) +
-                (evidenceScore * 0.15)
-            );
+        // S_domain: Unified scoring path for all domains
+        const S_domain = Math.round(
+            (domainScore * 0.35) +
+            (anatomyScore * 0.25) + // anatomyScore acts as primary entity match for non-medical domains
+            (techniqueScore * 0.15) +
+            (targetScore * 0.15) +
+            (evidenceScore * 0.10)
+        );
 
         // S_semantic: BM25 + suitability + metadata quality (0-100)
         const S_semantic = Math.round(
@@ -385,48 +413,11 @@ export function scoreCandidate(
         overall: finalScore,
         confirmedClaims: [],
         warnings: [
-            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€ score forced to 0'] : []),
-            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€  score forced to 0'] : []),
+            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query — score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],
-        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility Ã¢â‚¬â€  cannot score'] : undefined,
+        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility — cannot score'] : undefined,
     };
-
-    // 🚀    // — PHASE 3: Calibrate Confidence to Evidence — 
-    const requirementProfile = getRequirementProfile(rawQueryText);
-    let reqMatches: any[] = [];
-    if (requirementProfile.requirements.length > 0 && !modalityZeroKill) {
-        reqMatches = matchCandidateRequirements(candidate as UnifiedCandidate, requirementProfile);
-    }
-    const candReqMatches = reqMatches.length > 0 ? reqMatches : (candidate as UnifiedCandidate).requirementMatches || [];
-    
-    const verifiedReqs2 = candReqMatches.filter(m => m.status === 'SATISFIED');
-    const unknownReqs2 = candReqMatches.filter(m => m.status === 'UNKNOWN');
-    const failedReqs2 = candReqMatches.filter(m => m.status === 'NOT_SATISFIED');
-
-    const totalReqs = candReqMatches.length || 1;
-    let evidenceCoverage = verifiedReqs2.length / totalReqs;
-    if (candReqMatches.length === 0) evidenceCoverage = 1.0;
-
-    let baseConfidence = Math.round(evidenceCoverage * 100);
-
-    const missingCriticalReqs = failedReqs2.filter(m => {
-        const reqDef = requirementProfile.requirements.find(r => r.id === m.requirementId);
-        return reqDef?.importance === 'CRITICAL';
-    });
-    if (missingCriticalReqs.length > 0) {
-        baseConfidence = 0;
-    } else if (failedReqs2.length > 0) {
-        baseConfidence = Math.min(baseConfidence, 35);
-    } else if (unknownReqs2.length > 0) {
-        baseConfidence = Math.min(baseConfidence, 65);
-    }
-
-    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId)) || missingCriticalReqs.length > 0;
-    if (hardFailed) {
-        baseConfidence = 0;
-        finalScore = 0;
-    }
 
     const evidenceConfidence = baseConfidence;
 

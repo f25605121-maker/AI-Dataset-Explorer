@@ -1,0 +1,597 @@
+{
+  "query": "crop-yield/multispectral",
+  "interpretation": {
+    "rawQuery": "crop-yield/multispectral",
+    "domain": "Agriculture & Plant Pathology",
+    "subdomain": "Crop Disease Detection",
+    "tasks": [],
+    "modalities": [
+      "Multimodal / General"
+    ],
+    "dimensionality": "3D/4D",
+    "entities": [
+      "Crop Plant",
+      "Plant Leaf Disease"
+    ],
+    "hardwareConstraints": {
+      "maxVramGb": "UNKNOWN",
+      "requiresEdge": "UNKNOWN",
+      "gpuTarget": "UNKNOWN"
+    },
+    "datasetRequirements": {
+      "minimumSize": "UNKNOWN",
+      "temporalOrLongitudinal": "UNKNOWN",
+      "labelType": "UNKNOWN"
+    },
+    "unspecifiedFields": [],
+    "originalQuery": "crop-yield/multispectral",
+    "primaryDomain": "Agriculture & Plant Pathology",
+    "subDomain": [
+      "Crop Disease Detection",
+      "Plant Phenotyping",
+      "Precision Agriculture"
+    ],
+    "anatomy": [],
+    "targetEntities": [
+      "Crop Plant",
+      "Plant Leaf Disease"
+    ],
+    "modalitySubtypes": [],
+    "acquisitionTechnique": [],
+    "reconstructionTasks": [],
+    "predictionTasks": [],
+    "estimationTasks": [],
+    "physiologicalTargets": [],
+    "samplingStrategy": [],
+    "temporalRequirement": [],
+    "targetOutputs": [
+      "Crop Disease Classification Labels"
+    ],
+    "requiredCharacteristics": [
+      "Multimodal / General modality"
+    ],
+    "preferredCharacteristics": [
+      "Crop Disease Classification Labels"
+    ],
+    "excludedDomains": [
+      "Medical / Biomedical",
+      "Face Recognition",
+      "Generic CFD"
+    ],
+    "excludedAnatomy": [
+      "Brain",
+      "Heart",
+      "Liver",
+      "Kidney",
+      "Lung",
+      "Retina",
+      "Skin"
+    ],
+    "excludedTasks": [],
+    "synonyms": {
+      "4D Flow MRI": [
+        "4D phase-contrast MRI",
+        "4D PC-MRI",
+        "phase-contrast velocity MRI",
+        "4D flow MR"
+      ],
+      "sparse k-space": [
+        "radial undersampling",
+        "accelerated MRI",
+        "sub-Nyquist sampling",
+        "compressed sensing"
+      ],
+      "velocity field": [
+        "3D velocity vectors",
+        "blood flow velocity",
+        "velocity encoding",
+        "vector field"
+      ],
+      "wall shear stress": [
+        "WSS",
+        "hemodynamic shear stress",
+        "endothelial wall shear",
+        "shear stress estimation"
+      ],
+      "cardiac": [
+        "heart",
+        "cardiovascular",
+        "myocardium",
+        "aorta",
+        "aortic flow"
+      ],
+      "alzheimer": [
+        "dementia",
+        "mci",
+        "adni",
+        "oasis",
+        "cognitive decline",
+        "apoe"
+      ],
+      "diabetic retinopathy": [
+        "retinal fundus",
+        "retinopathy",
+        "eyepacs",
+        "messidor"
+      ],
+      "vehicle": [
+        "car",
+        "traffic",
+        "automobile",
+        "yolov8-seg"
+      ],
+      "cats and dogs": [
+        "pets",
+        "animals",
+        "oxford-iiit pet",
+        "feline",
+        "canine"
+      ]
+    },
+    "datasetQueries": [
+      "plant disease classification dataset",
+      "crop leaf disease images",
+      "plantvillage dataset"
+    ],
+    "modelQueries": [
+      "plant disease classification model",
+      "resnet50 plant disease"
+    ],
+    "paperQueries": [
+      "deep learning crop disease classification",
+      "plant pathology image classification"
+    ],
+    "benchmarkQueries": [
+      "PlantVillage",
+      "Plant Pathology Challenge"
+    ],
+    "ontologyTerms": [],
+    "confidence": 92,
+    "object": "Crop Plant",
+    "negativeConstraints": [
+      "Medical / Biomedical",
+      "Face Recognition",
+      "Generic CFD",
+      "Brain",
+      "Heart",
+      "Liver",
+      "Kidney",
+      "Lung",
+      "Retina",
+      "Skin"
+    ],
+    "task": "discovery",
+    "taskVariants": [],
+    "modality": [
+      "Multimodal / General"
+    ],
+    "sequence": [],
+    "target": [
+      "Crop Plant",
+      "Plant Leaf Disease"
+    ],
+    "annotation": [
+      "Crop Disease Classification Labels"
+    ],
+    "pretrainedModelRequired": true,
+    "datasetRequired": true,
+    "paperRequired": true,
+    "constraints": {
+      "mustMatchAnatomy": false,
+      "mustMatchModality": false,
+      "mustMatchTask": false,
+      "prefer3D": true
+    },
+    "positiveEntities": [
+      "Multimodal / General"
+    ],
+    "negativeEntities": [
+      "Brain",
+      "Heart",
+      "Liver",
+      "Kidney",
+      "Lung",
+      "Retina",
+      "Skin"
+    ],
+    "requiredConstraints": [
+      "Multimodal / General modality"
+    ],
+    "preferredConstraints": [
+      "Crop Disease Classification Labels"
+    ],
+    "softPreferences": [
+      "Open access license",
+      "Verified public repository"
+    ],
+    "specificEntityMentioned": null,
+    "parseConfidence": 92,
+    "parseLog": [
+      "Parsed query into primary domain: Agriculture & Plant Pathology",
+      "Anatomy detected: []",
+      "Modalities detected: [Multimodal / General]",
+      "Tasks: []"
+    ]
+  },
+  "datasets": {
+    "status": "CANDIDATES_FILTERED_OUT",
+    "message": "Found 10 datasets, but none passed the strict compatibility verification."
+  },
+  "models": {
+    "status": "NO_CANDIDATES_RETRIEVED",
+    "message": "No models found for this query."
+  },
+  "papers": {
+    "status": "CANDIDATES_FILTERED_OUT",
+    "message": "Found 24 papers, but none passed the strict compatibility verification."
+  },
+  "benchmarks": {
+    "status": "NO_CANDIDATES_RETRIEVED",
+    "message": "No benchmarks found for this query."
+  },
+  "rejectedResults": [],
+  "searchDiagnostics": {
+    "providersUsed": [
+      "Kaggle",
+      "Hugging Face",
+      "PubMed",
+      "OpenAlex",
+      "Semantic Scholar",
+      "arXiv"
+    ],
+    "queriesExecuted": 5,
+    "dataset_candidates_retrieved": 10,
+    "model_candidates_retrieved": 0,
+    "paper_candidates_retrieved": 24,
+    "dataset_filter_rejected": 0,
+    "model_filter_rejected": 0,
+    "dataset_final": 0,
+    "model_final": 0,
+    "candidatesRetrieved": 34,
+    "candidatesAfterDeduplication": 34,
+    "candidatesAfterFiltering": 34,
+    "candidatesReranked": 0,
+    "exactMatches": 0,
+    "partialMatches": 0,
+    "latencyMs": 12295,
+    "sourceDistribution": {
+      "kaggle": 0,
+      "huggingface_datasets": 0,
+      "huggingface_models": 0,
+      "semantic_scholar": 0,
+      "openalex": 20,
+      "arxiv": 0,
+      "pubmed": 4,
+      "curated_benchmarks": 0
+    },
+    "rejectionReasons": []
+  },
+  "searchEngineVersion": "2.0.0",
+  "confidenceStatus": "PARTIAL_OR_LOW_CONFIDENCE",
+  "lowConfidenceNotice": "No high-confidence matches found for this specific combination. Displaying nearest partial matches.",
+  "topScore": null,
+  "tiers": {
+    "exactMatches": [],
+    "strongMatches": [],
+    "partialMatches": [],
+    "relatedResources": []
+  },
+  "researchGraph": {
+    "nodes": [
+      {
+        "id": "query_root",
+        "label": "crop-yield/multispectral",
+        "type": "query"
+      },
+      {
+        "id": "task_discovery",
+        "label": "DISCOVERY",
+        "type": "task"
+      },
+      {
+        "id": "mod_Multimodal / General",
+        "label": "MULTIMODAL / GENERAL",
+        "type": "modality"
+      }
+    ],
+    "edges": [
+      {
+        "source": "query_root",
+        "target": "task_discovery",
+        "relationship": "EXECUTES_TASK"
+      },
+      {
+        "source": "query_root",
+        "target": "mod_Multimodal / General",
+        "relationship": "USES_MODALITY"
+      }
+    ]
+  },
+  "diagnostics": {
+    "funnel": {
+      "retrieved": 34,
+      "deduplicated": 34,
+      "hardFiltered": 34,
+      "semanticRanked": 34,
+      "crossEncoderReranked": 0,
+      "finalRecommended": 0
+    },
+    "parsedQuery": {
+      "rawQuery": "crop-yield/multispectral",
+      "domain": "Agriculture & Plant Pathology",
+      "subdomain": "Crop Disease Detection",
+      "tasks": [],
+      "modalities": [
+        "Multimodal / General"
+      ],
+      "dimensionality": "3D/4D",
+      "entities": [
+        "Crop Plant",
+        "Plant Leaf Disease"
+      ],
+      "hardwareConstraints": {
+        "maxVramGb": "UNKNOWN",
+        "requiresEdge": "UNKNOWN",
+        "gpuTarget": "UNKNOWN"
+      },
+      "datasetRequirements": {
+        "minimumSize": "UNKNOWN",
+        "temporalOrLongitudinal": "UNKNOWN",
+        "labelType": "UNKNOWN"
+      },
+      "unspecifiedFields": [],
+      "originalQuery": "crop-yield/multispectral",
+      "primaryDomain": "Agriculture & Plant Pathology",
+      "subDomain": [
+        "Crop Disease Detection",
+        "Plant Phenotyping",
+        "Precision Agriculture"
+      ],
+      "anatomy": [],
+      "targetEntities": [
+        "Crop Plant",
+        "Plant Leaf Disease"
+      ],
+      "modalitySubtypes": [],
+      "acquisitionTechnique": [],
+      "reconstructionTasks": [],
+      "predictionTasks": [],
+      "estimationTasks": [],
+      "physiologicalTargets": [],
+      "samplingStrategy": [],
+      "temporalRequirement": [],
+      "targetOutputs": [
+        "Crop Disease Classification Labels"
+      ],
+      "requiredCharacteristics": [
+        "Multimodal / General modality"
+      ],
+      "preferredCharacteristics": [
+        "Crop Disease Classification Labels"
+      ],
+      "excludedDomains": [
+        "Medical / Biomedical",
+        "Face Recognition",
+        "Generic CFD"
+      ],
+      "excludedAnatomy": [
+        "Brain",
+        "Heart",
+        "Liver",
+        "Kidney",
+        "Lung",
+        "Retina",
+        "Skin"
+      ],
+      "excludedTasks": [],
+      "synonyms": {
+        "4D Flow MRI": [
+          "4D phase-contrast MRI",
+          "4D PC-MRI",
+          "phase-contrast velocity MRI",
+          "4D flow MR"
+        ],
+        "sparse k-space": [
+          "radial undersampling",
+          "accelerated MRI",
+          "sub-Nyquist sampling",
+          "compressed sensing"
+        ],
+        "velocity field": [
+          "3D velocity vectors",
+          "blood flow velocity",
+          "velocity encoding",
+          "vector field"
+        ],
+        "wall shear stress": [
+          "WSS",
+          "hemodynamic shear stress",
+          "endothelial wall shear",
+          "shear stress estimation"
+        ],
+        "cardiac": [
+          "heart",
+          "cardiovascular",
+          "myocardium",
+          "aorta",
+          "aortic flow"
+        ],
+        "alzheimer": [
+          "dementia",
+          "mci",
+          "adni",
+          "oasis",
+          "cognitive decline",
+          "apoe"
+        ],
+        "diabetic retinopathy": [
+          "retinal fundus",
+          "retinopathy",
+          "eyepacs",
+          "messidor"
+        ],
+        "vehicle": [
+          "car",
+          "traffic",
+          "automobile",
+          "yolov8-seg"
+        ],
+        "cats and dogs": [
+          "pets",
+          "animals",
+          "oxford-iiit pet",
+          "feline",
+          "canine"
+        ]
+      },
+      "datasetQueries": [
+        "plant disease classification dataset",
+        "crop leaf disease images",
+        "plantvillage dataset"
+      ],
+      "modelQueries": [
+        "plant disease classification model",
+        "resnet50 plant disease"
+      ],
+      "paperQueries": [
+        "deep learning crop disease classification",
+        "plant pathology image classification"
+      ],
+      "benchmarkQueries": [
+        "PlantVillage",
+        "Plant Pathology Challenge"
+      ],
+      "ontologyTerms": [],
+      "confidence": 92,
+      "object": "Crop Plant",
+      "negativeConstraints": [
+        "Medical / Biomedical",
+        "Face Recognition",
+        "Generic CFD",
+        "Brain",
+        "Heart",
+        "Liver",
+        "Kidney",
+        "Lung",
+        "Retina",
+        "Skin"
+      ],
+      "task": "discovery",
+      "taskVariants": [],
+      "modality": [
+        "Multimodal / General"
+      ],
+      "sequence": [],
+      "target": [
+        "Crop Plant",
+        "Plant Leaf Disease"
+      ],
+      "annotation": [
+        "Crop Disease Classification Labels"
+      ],
+      "pretrainedModelRequired": true,
+      "datasetRequired": true,
+      "paperRequired": true,
+      "constraints": {
+        "mustMatchAnatomy": false,
+        "mustMatchModality": false,
+        "mustMatchTask": false,
+        "prefer3D": true
+      },
+      "positiveEntities": [
+        "Multimodal / General"
+      ],
+      "negativeEntities": [
+        "Brain",
+        "Heart",
+        "Liver",
+        "Kidney",
+        "Lung",
+        "Retina",
+        "Skin"
+      ],
+      "requiredConstraints": [
+        "Multimodal / General modality"
+      ],
+      "preferredConstraints": [
+        "Crop Disease Classification Labels"
+      ],
+      "softPreferences": [
+        "Open access license",
+        "Verified public repository"
+      ],
+      "specificEntityMentioned": null,
+      "parseConfidence": 92,
+      "parseLog": [
+        "Parsed query into primary domain: Agriculture & Plant Pathology",
+        "Anatomy detected: []",
+        "Modalities detected: [Multimodal / General]",
+        "Tasks: []"
+      ]
+    },
+    "generatedQueries": {
+      "datasetQueries": [
+        "plant disease classification dataset",
+        "crop leaf disease images",
+        "plantvillage dataset"
+      ],
+      "modelQueries": [
+        "plant disease classification model",
+        "resnet50 plant disease"
+      ],
+      "paperQueries": [
+        "deep learning crop disease classification",
+        "plant pathology image classification"
+      ]
+    },
+    "sourceDistribution": {
+      "huggingface": 10,
+      "openalex": 20,
+      "pubmed": 4
+    },
+    "rejectionReasons": [],
+    "timingsMs": {
+      "queryUnderstanding": 15,
+      "retrieval": 180,
+      "deduplication": 25,
+      "hardFilter": 35,
+      "semanticRanking": 45,
+      "crossEncoder": 55,
+      "evidenceVerification": 30,
+      "diversity": 15,
+      "total": 12295
+    }
+  },
+  "telemetry": {
+    "retrievalCount": 34,
+    "filteredCount": 0,
+    "rerankedCount": 0,
+    "finalCount": 0,
+    "averageScore": 0,
+    "lowConfidenceCount": 0,
+    "sourceDistribution": {
+      "kaggle": 0,
+      "huggingface_datasets": 0,
+      "huggingface_models": 0,
+      "semantic_scholar": 0,
+      "openalex": 20,
+      "arxiv": 0,
+      "pubmed": 4,
+      "curated_benchmarks": 0
+    },
+    "rejectionReasonsCount": {}
+  },
+  "hardware": {
+    "gpu_recommendation": "NVIDIA RTX 4080 (16GB) or RTX 3080 (10GB)",
+    "vram_estimate": "8-16 GB VRAM",
+    "training_time_estimate": "~4-8 hours",
+    "cost_estimate": "$8 - $20"
+  },
+  "feasibility": {
+    "status": "Technically Feasible with Specialized Architecture",
+    "gpuTarget": "NVIDIA RTX 4080 (16GB) or RTX 3080 (10GB)",
+    "feasibility_score": 90,
+    "level": "High Precision / Advanced Compute"
+  },
+  "scientificSynthesis": "Scientific discovery focused on Agriculture & Plant Pathology addressing computational modeling. Recommended resources prioritize verified open datasets, well-established architectures, and peer-reviewed benchmark studies. Consult the datasets, models, and papers listed below for domain-specific implementations."
+}
