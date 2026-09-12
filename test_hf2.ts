@@ -1,0 +1,1 @@
+import { fetchHuggingFaceDatasets } from './src/server/search/providers/huggingface'; async function main() { const res = await fetchHuggingFaceDatasets(['lung cancer detection from 3D chest CT'], { rawQuery: 'lung cancer' }); console.log(res.length); }; main();

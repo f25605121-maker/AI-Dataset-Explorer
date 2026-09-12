@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Query Understanding Engine (Search Engine 2.0.0)
  *
  * Converts natural-language research problem statements into a deep, structured
@@ -443,7 +443,8 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         paperQueries.push('deep learning crop disease classification', 'plant pathology image classification');
         benchmarkQueries.push('PlantVillage', 'Plant Pathology Challenge');
     } else {
-        const primaryTarget = targetEntities[0] || anatomy[0] || (q.length > 30 ? q.slice(0, 30) : q);
+        const primaryAnatomy = anatomy.find(a => !a.includes('_') && a !== a.toUpperCase()) || anatomy[1] || anatomy[0];
+        const primaryTarget = targetEntities[0] || primaryAnatomy || (q.split(/[,\.]/)[0] || q).split(' ').slice(0, 4).join(' ');
         const primaryMod = modalities[0] && modalities[0] !== 'Multimodal / General' ? modalities[0] : '';
         const primaryTsk = (reconstructionTasks[0] || predictionTasks[0] || estimationTasks[0] || '').split(' ')[0];
         datasetQueries.push(`${primaryTarget} ${primaryMod} ${primaryTsk}`.trim(), `${primaryTarget} ${primaryMod}`.trim(), `${primaryTarget} dataset`.trim());

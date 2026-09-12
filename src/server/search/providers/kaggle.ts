@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Kaggle Provider Adapter
  *
  * Fetches and normalizes dataset candidates from the Kaggle API into standard UnifiedCandidate format.
@@ -18,7 +18,7 @@ export async function fetchKaggleCandidates(
     const isCryoQuery =
         understanding.rawQuery.toLowerCase().includes('cryo') ||
         understanding.rawQuery.toLowerCase().includes('tomography') ||
-        understanding.modality.includes('Cryo-EM/ET');
+        (understanding.modalities && understanding.modalities.includes('Cryo-EM/ET'));
 
     const headers = getKaggleAuthHeaders();
     if (!headers['Authorization']) {

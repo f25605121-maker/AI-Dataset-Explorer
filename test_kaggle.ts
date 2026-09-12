@@ -1,0 +1,1 @@
+import { fetchKaggleCandidates } from './src/server/search/providers/kaggle'; async function main() { const res = await fetchKaggleCandidates('lung cancer', { rawQuery: 'lung cancer' }); console.log(JSON.stringify(res, null, 2)); }; main();

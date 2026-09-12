@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Hybrid Retrieval & Dynamic Query-Adaptive Scoring Engine (Search Engine 2.0.0)
  *
  * Implements Section 10, 11, 23:
@@ -383,9 +383,8 @@ export function scoreCandidate(
         accessibility: accessibilityScore,
         popularity: popularityScore,
         overall: finalScore,
-        confirmedClaims: ({} as any).confirmedClaims,
+        confirmedClaims: [],
         warnings: [
-            ...({} as any).warnings,
             ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€ score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],

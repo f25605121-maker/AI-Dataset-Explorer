@@ -1,0 +1,1 @@
+async function main() { const url = 'https://huggingface.co/api/datasets?search=' + encodeURIComponent('lung cancer detection from 3D chest CT') + '&full=true&limit=30'; const res = await fetch(url); const json = await res.json(); console.log(json.length); console.log(json); }; main();
