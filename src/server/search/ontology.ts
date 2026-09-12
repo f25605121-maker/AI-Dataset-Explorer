@@ -90,8 +90,8 @@ export const ANATOMY_ONTOLOGY: Record<string, AnatomyDefinition> = {
     },
     skin: {
         canonical: 'SKIN',
-        terms: ['skin', 'melanoma', 'dermoscopy', 'dermatology', 'cutaneous', 'dermatological', 'skin lesion', 'nevus', 'keratosis'],
-        synonyms: ['skin', 'melanoma', 'dermoscopy', 'cutaneous'],
+        terms: ['skin cancer', 'skin lesion', 'melanoma', 'dermoscopy', 'dermatology', 'cutaneous', 'dermatological', 'nevus', 'keratosis'],
+        synonyms: ['skin lesion', 'melanoma', 'dermoscopy', 'cutaneous'],
         organs: ['skin', 'epidermis'],
         conflictingGroups: ['brain', 'abdomen', 'cardiac', 'pelvis_prostate', 'musculoskeletal', 'eye', 'face'],
         benchmarks: ['isic', 'ham10000', 'pad-ufes-20'],

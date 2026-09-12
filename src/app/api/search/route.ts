@@ -196,9 +196,10 @@ export async function POST(req: NextRequest) {
         const hfModels = engineResult.models;
         const papers = engineResult.papers;
 
-        const bestDataset = engineResult.datasets[0] || null;
-        const bestModel = engineResult.models[0] || null;
-        const bestPaper = engineResult.papers[0] || null;
+        const MIN_THRESHOLD = 30;
+        const bestDataset = (engineResult.datasets[0] && (engineResult.datasets[0] as any).matchScore >= MIN_THRESHOLD) ? engineResult.datasets[0] : null;
+        const bestModel = (engineResult.models[0] && (engineResult.models[0] as any).matchScore >= MIN_THRESHOLD) ? engineResult.models[0] : null;
+        const bestPaper = (engineResult.papers[0] && (engineResult.papers[0] as any).matchScore >= MIN_THRESHOLD) ? engineResult.papers[0] : null;
 
         const targetArr = Array.isArray(engineResult.constraints?.target) ? engineResult.constraints.target : [];
         const modalityArr = Array.isArray(engineResult.constraints?.modality) ? engineResult.constraints.modality : [];

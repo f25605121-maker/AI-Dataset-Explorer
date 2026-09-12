@@ -386,35 +386,40 @@ export function scoreCandidate(
         confirmedClaims: [],
         warnings: [
             ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€ score forced to 0'] : []),
+            ...(modalityZeroKill ? ['MODALITY_ZERO_KILL: candidate modality is incompatible with query Ã¢â‚¬â€  score forced to 0'] : []),
             ...(taskAlignment.matchType === 'ORTHOGONAL' ? [`TASK_MISMATCH: query task and candidate task are orthogonal (penalty: ${Math.round(taskAlignment.penaltyApplied * 100)}%)`] : []),
         ],
-        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility Ã¢â‚¬â€ cannot score'] : undefined,
+        disqualifications: modalityZeroKill ? ['Fundamental modality incompatibility Ã¢â‚¬â€  cannot score'] : undefined,
     };
 
-    // ðŸš€ PHASE 3: Calibrate Confidence to Evidence ðŸš€
-    const candReqMatches = (candidate as UnifiedCandidate).requirementMatches || [];
+    // 🚀    // — PHASE 3: Calibrate Confidence to Evidence — 
+    const requirementProfile = getRequirementProfile(rawQueryText);
+    let reqMatches: any[] = [];
+    if (requirementProfile.requirements.length > 0 && !modalityZeroKill) {
+        reqMatches = matchCandidateRequirements(candidate as UnifiedCandidate, requirementProfile);
+    }
+    const candReqMatches = reqMatches.length > 0 ? reqMatches : (candidate as UnifiedCandidate).requirementMatches || [];
+    
     const verifiedReqs2 = candReqMatches.filter(m => m.status === 'SATISFIED');
     const unknownReqs2 = candReqMatches.filter(m => m.status === 'UNKNOWN');
     const failedReqs2 = candReqMatches.filter(m => m.status === 'NOT_SATISFIED');
 
     const totalReqs = candReqMatches.length || 1;
     let evidenceCoverage = verifiedReqs2.length / totalReqs;
-    
-    // If no explicit requirements (e.g., generic query), default coverage to 1.0
     if (candReqMatches.length === 0) evidenceCoverage = 1.0;
 
     let baseConfidence = Math.round(evidenceCoverage * 100);
 
-    // Apply caps
-    if (unknownReqs2.length > 0) {
-        baseConfidence = Math.min(baseConfidence, 65); // Cap if critical attributes are unknown
+    const missingMustReqs = failedReqs2.filter(m => m.importance === 'MUST');
+    if (missingMustReqs.length > 0) {
+        baseConfidence = 0;
+    } else if (failedReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 35);
+    } else if (unknownReqs2.length > 0) {
+        baseConfidence = Math.min(baseConfidence, 65);
     }
-    if (failedReqs2.length > 0) {
-        baseConfidence = Math.min(baseConfidence, 35); // Cap if soft failed
-    }
-    
-    // Hard constraint failed -> handled upstream, but just in case:
-    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId));
+
+    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId)) || missingMustReqs.length > 0;
     if (hardFailed) {
         baseConfidence = 0;
         finalScore = 0;
@@ -527,10 +532,8 @@ export function scoreCandidate(
     // â”€â”€ REQUIREMENT-AWARE CALIBRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Extracts requirements from query, matches candidate, applies caps.
     // This replaces finalScore with a requirement-coverage-dominant score.
-    const requirementProfile = getRequirementProfile(rawQueryText);
     let calibratedFinalScore = finalScore;
     let reqMatchLevel: string | null = null;
-    let reqMatches: any[] = [];
     let reqCoverage = 50;
     let hardConstraintScore = 100;
     let technicalCompatibility = 75;
@@ -542,7 +545,6 @@ export function scoreCandidate(
     let conflictingReqs: string[] = [];
 
     if (requirementProfile.requirements.length > 0 && !modalityZeroKill) {
-        reqMatches = matchCandidateRequirements(candidate as UnifiedCandidate, requirementProfile);
         const calibrated = calibrateScore(finalScore, evidenceConfidence, candidate as UnifiedCandidate, reqMatches, requirementProfile);
         calibratedFinalScore = calibrated.finalScore;
         reqMatchLevel = calibrated.matchLevel;

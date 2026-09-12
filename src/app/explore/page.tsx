@@ -384,11 +384,13 @@ function ExploreContent() {
         return t;
     };
 
-    const bestDataset = summary?.bestDataset || (datasets.length > 0 ? datasets[0] : null);
+    const MIN_SCORE = 30;
+    const bestDataset = summary?.bestDataset || (datasets.length > 0 && (datasets[0].matchScore ?? 100) > MIN_SCORE ? datasets[0] : null);
 
     const bestModel: any = useMemo(() => {
         if (summary?.bestModel) return summary.bestModel;
-        if (models.length > 0) return models[0];
+        const validModels = models.filter(m => (m.matchScore ?? 100) > MIN_SCORE);
+        if (validModels.length > 0) return validModels[0];
 
         // Construct generalized foundation/backbone baseline when 0 fine-tuned models exist
         const qText = `${submittedQuery} ${searchInput} ${sessionQuery} ${analysis?.domain || ''} ${analysis?.data_modality || ''}`.toLowerCase();

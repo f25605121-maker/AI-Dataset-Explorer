@@ -118,22 +118,17 @@ export function StitchEmptyState({
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-semibold uppercase tracking-wider">
-                  Zero Direct Matches
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">
+                  No Direct Results
                 </span>
-                {modality && (
-                  <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 text-[10px] font-mono font-semibold">
-                    Modality: {modality}
-                  </span>
-                )}
                 {domain && (
-                  <span className="px-2 py-0.5 rounded-full bg-card border border-subtle text-muted text-[10px] font-mono font-semibold">
-                    Domain: {domain}
+                  <span className="px-2 py-0.5 rounded-full bg-card-subtle border border-subtle text-muted text-[10px] font-mono font-medium truncate max-w-[120px] sm:max-w-[200px]">
+                    {domain.split("/").pop()}
                   </span>
                 )}
               </div>
               <h3 className="text-sm sm:text-base font-bold text-primary">
-                {title || "0 Datasets Returned on General Hubs"}
+                {title || "No qualifying dataset found"}
               </h3>
               <p className="text-xs text-muted leading-relaxed break-words max-w-xl">
                 {isCryoModality
