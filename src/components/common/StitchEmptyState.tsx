@@ -35,7 +35,7 @@ export function StitchEmptyState({
     .replace(/^(system|model|dataset|project)\s+(to|for)\s+/i, '')
     .trim();
     
-  const queryWords = strippedQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  const queryWords = Array.from(new Set(strippedQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()))));
   const relaxedChips = queryWords.slice(0, 4).map(w => ({
     label: `Search '${w}'`,
     query: w
@@ -163,9 +163,9 @@ export function StitchEmptyState({
             <span className="text-[11px] text-muted">Click any chip to search</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {relaxedChips.map((chip) => (
+            {relaxedChips.map((chip, idx) => (
               <button
-                key={chip.label}
+                key={`${chip.label}-${idx}`}
                 onClick={() => onRelaxQuery && onRelaxQuery(chip.query)}
                 className="px-3.5 py-1.5 rounded-xl border border-accent/20 bg-accent/5 hover:bg-accent/15 hover:border-accent/40 text-accent text-xs font-medium transition-all flex items-center gap-1.5 group"
               >
