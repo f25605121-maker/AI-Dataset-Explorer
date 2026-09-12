@@ -1,1 +1,0 @@
-import { fetchHFDatasets } from './src/server/search/providers/huggingface'; async function main() { const res = await fetchHFDatasets('lung cancer', { rawQuery: 'lung cancer' }); console.log(res.length); }; main();

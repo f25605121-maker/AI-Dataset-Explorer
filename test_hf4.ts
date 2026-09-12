@@ -1,1 +1,0 @@
-async function main() { const url = 'https://huggingface.co/api/datasets?search=' + encodeURIComponent('lung cancer') + '&full=true&limit=30'; const res = await fetch(url); const json = await res.json(); console.log(json.length); }; main();

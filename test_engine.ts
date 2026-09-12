@@ -1,1 +1,0 @@
-import { advancedResearchSearch } from './src/server/search/searchEngine'; async function main() { const res = await advancedResearchSearch('early-stage lung cancer detection from 3D chest CT, 10GB GPU limit'); console.log('Datasets:', Array.isArray(res.datasets) ? res.datasets.length : res.datasets); console.log('Rejected:', res.rejectedResults.length); }; main();
