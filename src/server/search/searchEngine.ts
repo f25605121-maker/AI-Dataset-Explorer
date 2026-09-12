@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Master Research Search Engine Orchestrator (Search Engine 2.0.0)
  *
  * Implements Section 16 & Section 64:
@@ -69,7 +69,24 @@ export async function advancedResearchSearch(
     const expanded = expandQueries(schema);
 
     // â”€â”€ STAGE 4: Concurrent Multi-Source Retrieval â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const rawPools = await retrieveAllCandidates(expanded, understanding);
+    let rawPools = await retrieveAllCandidates(expanded, understanding);
+    
+    // Auto-Relaxation Retry if 0 datasets retrieved
+    if (rawPools.datasets.length === 0) {
+        const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models"]);
+        const fallbackWords = understanding.rawQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+        const fallbackQueries = fallbackWords.slice(0, 4);
+        if (fallbackWords.length >= 2) {
+            fallbackQueries.unshift(fallbackWords.slice(0, 2).join(' '));
+        }
+        if (fallbackQueries.length > 0) {
+            const fallbackExpanded = { ...expanded, datasetQueries: fallbackQueries };
+            const fallbackPools = await retrieveAllCandidates(fallbackExpanded, understanding);
+            rawPools.datasets = fallbackPools.datasets;
+            rawPools.allCandidates = [...rawPools.datasets, ...rawPools.models, ...rawPools.papers];
+        }
+    }
+    
     const totalRetrieved = rawPools.allCandidates.length;
 
     // â”€â”€ STAGE 5: Cross-Source Deduplication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -128,7 +145,7 @@ export async function advancedResearchSearch(
 
     const rankedDatasets = datasetRerankResult.candidates;
     const rankedModels = modelRerankResult.candidates;
-    const rankedPapers = paperRerankResult.candidates;
+    const rankedPapers = paperRerankResult.candidates.filter((p: any) => p.matchScore >= 30);
 
     // Overall confidence = worst of the three (if any primary type is low-confidence, flag it)
     const overallTopScore = Math.max(

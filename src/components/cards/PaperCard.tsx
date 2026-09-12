@@ -135,7 +135,9 @@ export default function PaperCard({ paper, onOpenDetails }: PaperCardProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <ConfidenceBadge score={paper.confidenceScore || 85} showLabel={false} />
+                        {paper.confidenceScore !== undefined && (
+                            <ConfidenceBadge score={paper.confidenceScore} showLabel={false} />
+                        )}
 
                         <span className="text-xs font-mono font-bold text-muted">
                             {year}

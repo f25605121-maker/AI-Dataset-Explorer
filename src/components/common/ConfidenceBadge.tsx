@@ -8,7 +8,8 @@ export interface ConfidenceBadgeProps {
   className?: string;
 }
 
-export function ConfidenceBadge({ score = 85, showLabel = true, className = "" }: ConfidenceBadgeProps) {
+export function ConfidenceBadge({ score, showLabel = true, className = "" }: ConfidenceBadgeProps) {
+  if (score === undefined) return null;
   let colorClass = "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
   if (score < 60) {
     colorClass = "text-amber-400 bg-amber-500/10 border-amber-500/30";

@@ -24,12 +24,11 @@ import { computeRequirementCoverage, computeHardConstraintScore } from "./requir
 
 // ── Configurable caps ─────────────────────────────────────────────────────────
 const CAPS = {
-    CRITICAL_HARD_VIOLATION_MUST: 0, // MUST requirement failed
     DOMAIN_CONFLICT:           25,   // explicit domain CONFLICT in title
-    CRITICAL_HARD_VIOLATIONS_2: 38,  // 2+ critical hard requirements missing/conflict
-    CRITICAL_HARD_VIOLATION_1:  45,  // 1 critical hard requirement missing/conflict
+    CRITICAL_HARD_VIOLATIONS_2: 0,   // 2+ critical hard requirements missing/conflict
+    CRITICAL_HARD_VIOLATION_1:  0,   // 1 critical hard requirement missing/conflict
     MULTIPLE_SOFT_VIOLATIONS:   55,  // 3+ soft requirements missing (but no hard violations)
-    TASK_MISMATCH:              45,  // hard task mismatch
+    TASK_MISMATCH:              0,   // hard task mismatch
     NO_HARD_CAP:               100, // no violations
 } as const;
 
@@ -87,27 +86,24 @@ function estimateTechnicalCompatibility(
 function countCriticalViolations(
     matches: RequirementMatch[],
     profile: RequirementProfile
-): { critical: number; any: number; hasConflict: boolean; mustViolations: number } {
+): { critical: number; any: number; hasConflict: boolean } {
     let critical = 0;
     let any = 0;
     let hasConflict = false;
-    let mustViolations = 0;
 
     for (const m of matches) {
         if (!profile.hardRequirementIds.includes(m.requirementId)) continue;
         const req = profile.requirements.find((r) => r.id === m.requirementId);
         const isCritical = req?.importance === "CRITICAL";
-        const isMust = req?.importance === "MUST";
         const isBad = m.status === "NOT_SATISFIED" || m.status === "CONFLICT";
 
         if (isBad) {
             any++;
-            if (isMust) mustViolations++;
             if (isCritical) critical++;
             if (m.status === "CONFLICT") hasConflict = true;
         }
     }
-    return { critical, any, hasConflict, mustViolations };
+    return { critical, any, hasConflict };
 }
 
 /**
@@ -117,9 +113,6 @@ function countCriticalViolations(
 function computeCap(
     violations: ReturnType<typeof countCriticalViolations>
 ): { cap: number | null; reason: string | null } {
-    if (violations.mustViolations > 0) {
-        return { cap: CAPS.CRITICAL_HARD_VIOLATION_MUST, reason: `${violations.mustViolations} MUST requirements missing` };
-    }
     if (violations.hasConflict) {
         return { cap: CAPS.DOMAIN_CONFLICT, reason: "Domain CONFLICT: explicit domain contradiction in candidate" };
     }

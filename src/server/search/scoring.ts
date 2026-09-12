@@ -410,8 +410,8 @@ export function scoreCandidate(
 
     let baseConfidence = Math.round(evidenceCoverage * 100);
 
-    const missingMustReqs = failedReqs2.filter(m => m.importance === 'MUST');
-    if (missingMustReqs.length > 0) {
+    const missingCriticalReqs = failedReqs2.filter(m => m.importance === 'CRITICAL');
+    if (missingCriticalReqs.length > 0) {
         baseConfidence = 0;
     } else if (failedReqs2.length > 0) {
         baseConfidence = Math.min(baseConfidence, 35);
@@ -419,7 +419,7 @@ export function scoreCandidate(
         baseConfidence = Math.min(baseConfidence, 65);
     }
 
-    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId)) || missingMustReqs.length > 0;
+    const hardFailed = failedReqs2.some(m => ['req_modality', 'req_vram'].includes(m.requirementId)) || missingCriticalReqs.length > 0;
     if (hardFailed) {
         baseConfidence = 0;
         finalScore = 0;

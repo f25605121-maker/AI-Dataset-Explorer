@@ -29,20 +29,18 @@ export function StitchEmptyState({
     /cryo|tomography|subtomogram|macromolecule/i.test(query) ||
     /cryo/i.test(modality || "");
 
-  // Niche modality relaxed query chips
-  const relaxedChips = isCryoModality
-    ? [
-        { label: "cryo-et", query: "cryo-et" },
-        { label: "cryo-em", query: "cryo-em" },
-        { label: "electron tomography", query: "electron tomography" },
-        { label: "macromolecule structural", query: "macromolecule structural" },
-        { label: "subtomogram", query: "subtomogram" },
-      ]
-    : [
-        { label: "Broaden Modality", query: query.replace(/\b(3d|4d|sparse|high-res)\b/gi, "").trim() || "medical imaging" },
-        { label: "Benchmark Datasets", query: `${query.split(" ").slice(0, 2).join(" ")} benchmark` },
-        { label: "Deep Learning Checkpoints", query: `${query.split(" ").slice(0, 2).join(" ")} deep learning` },
-      ];
+  const stopWords = new Set(["with", "using", "for", "the", "and", "data", "dataset", "datasets", "model", "models"]);
+  const queryWords = (query || "").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  const relaxedChips = queryWords.slice(0, 4).map(w => ({
+    label: `Search '${w}'`,
+    query: w
+  }));
+  if (queryWords.length >= 2) {
+    relaxedChips.unshift({
+      label: `Broader: ${queryWords.slice(0, 2).join(" ")}`,
+      query: queryWords.slice(0, 2).join(" ")
+    });
+  }
 
   // External specialized scientific repositories
   const specializedArchives = [

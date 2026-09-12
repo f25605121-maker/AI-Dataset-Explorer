@@ -24,31 +24,31 @@ export function MatchBreakdown({
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
   const b = breakdown || {
-    anatomy: 90,
-    modality: 90,
-    task: 85,
-    dimension: 85,
-    target: 80,
-    domain: 90,
-    semantic: 85,
-    evidence: 80,
-    metadata: 75,
-    accessibility: 85,
-    popularity: 50,
+    anatomy: 0,
+    modality: 0,
+    task: 0,
+    dimension: 0,
+    target: 0,
+    domain: 0,
+    semantic: 0,
+    evidence: 0,
+    metadata: 0,
+    accessibility: 0,
+    popularity: 0,
     overall: overallScore,
     confirmedClaims: [],
     warnings: warnings,
   };
 
   const dimensions = [
-    { label: "Anatomy Alignment", score: b.anatomy ?? 90, weight: "25%" },
-    { label: "Task Alignment", score: b.task ?? 85, weight: "18%" },
-    { label: "Modality Alignment", score: b.modality ?? 85, weight: "15%" },
-    { label: "Target / Labels", score: b.target ?? 80, weight: "10%" },
-    { label: "Dimensionality (3D/2D)", score: b.dimension ?? 85, weight: "8%" },
-    { label: "Semantic Similarity", score: b.semantic ?? 80, weight: "8%" },
-    { label: "Primary Evidence", score: b.evidence ?? 80, weight: "6%" },
-    { label: "Metadata Quality", score: b.metadata ?? 75, weight: "4%" },
+    { label: "Anatomy Alignment", score: b.anatomy ?? 0, weight: "25%" },
+    { label: "Task Alignment", score: b.task ?? 0, weight: "18%" },
+    { label: "Modality Alignment", score: b.modality ?? 0, weight: "15%" },
+    { label: "Target / Labels", score: b.target ?? 0, weight: "10%" },
+    { label: "Dimensionality (3D/2D)", score: b.dimension ?? 0, weight: "8%" },
+    { label: "Semantic Similarity", score: b.semantic ?? 0, weight: "8%" },
+    { label: "Primary Evidence", score: b.evidence ?? 0, weight: "6%" },
+    { label: "Metadata Quality", score: b.metadata ?? 0, weight: "4%" },
   ];
 
   const getScoreBarColor = (s: number) => {
