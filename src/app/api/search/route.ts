@@ -128,9 +128,10 @@ export async function POST(req: NextRequest) {
         // Step 2: Intent & Conversational query check
         const intentClassification = await classifyIntent(safeQuery);
 
-        const isNonDatasetQuery =
-            !intentClassification.datasetRequired ||
-            ['GREETING', 'GENERAL_AI', 'EXPLAIN_CONCEPT'].includes(intentClassification.intent);
+        // The user explicitly requested that dataset recommendation should still run 
+        // even if the LLM thinks it's a general query and they didn't explicitly ask for a dataset.
+        // We only bypass dataset search for pure greetings.
+        const isNonDatasetQuery = intentClassification.intent === 'GREETING';
 
         if (isNonDatasetQuery) {
             const generalAnswer = await runGeneralAIPipeline([{ role: 'user', content: safeQuery }]);

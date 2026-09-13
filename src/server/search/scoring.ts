@@ -365,6 +365,25 @@ export function scoreCandidate(
         const S_task = blendedTaskScore;
 
         // S_domain: Unified scoring path for all domains
+        if (
+            typeof domainScore !== 'number' || isNaN(domainScore) ||
+            typeof anatomyScore !== 'number' || isNaN(anatomyScore) ||
+            typeof techniqueScore !== 'number' || isNaN(techniqueScore) ||
+            typeof targetScore !== 'number' || isNaN(targetScore) ||
+            typeof evidenceScore !== 'number' || isNaN(evidenceScore)
+        ) {
+            console.error('CRITICAL SCORE ERROR:', {
+                domainScore, anatomyScore, techniqueScore, targetScore, evidenceScore
+            });
+            throw new Error(`One or more S_domain components are invalid (NaN or undefined)!`);
+        }
+
+        if ((global as any).__DEBUG_SCORING) {
+             console.log('--- S_DOMAIN INPUTS ---', {
+                domainScore, anatomyScore, techniqueScore, targetScore, evidenceScore
+            });
+        }
+
         const S_domain = Math.round(
             (domainScore * 0.35) +
             (anatomyScore * 0.25) + // anatomyScore acts as primary entity match for non-medical domains
