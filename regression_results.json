@@ -1,0 +1,287 @@
+[
+  {
+    "id": 1,
+    "name": "Lung Cancer 3D CT",
+    "query": "Lung cancer / 3D chest CT (classification + detection + segmentation, 10GB)",
+    "elapsedMs": 15997,
+    "domainExtracted": "Biomedical / Pulmonary & Thoracic Imaging",
+    "tasksExtracted": [
+      "Segmentation",
+      "Object Detection",
+      "Classification"
+    ],
+    "hardwareExtracted": "Max 10 GB VRAM",
+    "hardwareFull": {
+      "gpu_recommendation": "User constrained to 10 GB VRAM limit",
+      "vram_estimate": "Max 10 GB VRAM",
+      "training_time_estimate": "~5-10 hours",
+      "cost_estimate": "$10 - $25"
+    },
+    "counts": {
+      "datasets": 25,
+      "models": 25,
+      "papers": 30,
+      "total": 80
+    },
+    "topScores": {
+      "datasets": [
+        {
+          "title": "lung-cancer",
+          "score": 71,
+          "tier": "Tier B",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "lung-cancer",
+          "score": 71,
+          "tier": "Tier B",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "models": [
+        {
+          "title": "swin-tiny-patch4-finetuned-lung-cancer-ct-scans",
+          "score": 59,
+          "tier": "Tier C",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "Lung_cancer_Prediction_using_EfficientNetV5",
+          "score": 53,
+          "tier": "Tier C",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "papers": [
+        {
+          "title": "A few-shot U-Net deep learning model for lung cancer lesion segmentation via PET/CT imaging",
+          "score": 85,
+          "tier": "Tier B",
+          "evidence": "SUPPORTED"
+        },
+        {
+          "title": "A review of uncertainty quantification in deep learning: Techniques, applications and challenges",
+          "score": 77,
+          "tier": "Tier B",
+          "evidence": "SUPPORTED"
+        }
+      ]
+    },
+    "confidenceStatus": "HIGH",
+    "synthesis": "..."
+  },
+  {
+    "id": 2,
+    "name": "Aircraft Fuselage Defects",
+    "query": "Aircraft fuselage skin panel defects / 2D RGB (classification + detection + segmentation, 8GB)",
+    "elapsedMs": 19360,
+    "domainExtracted": "Aerospace & Industrial Defect Inspection",
+    "tasksExtracted": [
+      "Segmentation",
+      "Object Detection",
+      "Classification"
+    ],
+    "hardwareExtracted": "Max 8 GB VRAM",
+    "hardwareFull": {
+      "gpu_recommendation": "User constrained to 8 GB VRAM limit",
+      "vram_estimate": "Max 8 GB VRAM",
+      "training_time_estimate": "~4-8 hours",
+      "cost_estimate": "$8 - $20"
+    },
+    "counts": {
+      "datasets": 19,
+      "models": 2,
+      "papers": 30,
+      "total": 51
+    },
+    "topScores": {
+      "datasets": [
+        {
+          "title": "Land Cover Classification : Bhuvan Satellite Data",
+          "score": 56,
+          "tier": "Tier C",
+          "evidence": "SUPPORTED"
+        },
+        {
+          "title": "SPE3R: Synthetic Dataset for Satellites",
+          "score": 56,
+          "tier": "Tier C",
+          "evidence": "SUPPORTED"
+        }
+      ],
+      "models": [
+        {
+          "title": "RALL_RGBCROP_Aug16F-2DO1",
+          "score": 36,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "RALL_RGBCROP_Aug16F-2DO2",
+          "score": 36,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "papers": [
+        {
+          "title": "A review of uncertainty quantification in deep learning: Techniques, applications and challenges",
+          "score": 74,
+          "tier": "Tier B",
+          "evidence": "VERIFIED"
+        },
+        {
+          "title": "Deep learning in remote sensing applications: A meta-analysis and review",
+          "score": 74,
+          "tier": "Tier B",
+          "evidence": "VERIFIED"
+        }
+      ]
+    },
+    "confidenceStatus": "LOW/PARTIAL",
+    "synthesis": "..."
+  },
+  {
+    "id": 3,
+    "name": "Crop Yield & Disease",
+    "query": "Crop yield + disease / multispectral satellite (regression + classification + segmentation, 6GB)",
+    "elapsedMs": 13042,
+    "domainExtracted": "Agriculture & Remote Sensing",
+    "tasksExtracted": [
+      "Regression",
+      "Segmentation",
+      "Classification"
+    ],
+    "hardwareExtracted": "Max 6 GB VRAM",
+    "hardwareFull": {
+      "gpu_recommendation": "User constrained to 6 GB VRAM limit",
+      "vram_estimate": "Max 6 GB VRAM",
+      "training_time_estimate": "~6-12 hours",
+      "cost_estimate": "$10 - $25"
+    },
+    "counts": {
+      "datasets": 25,
+      "models": 25,
+      "papers": 30,
+      "total": 80
+    },
+    "topScores": {
+      "datasets": [
+        {
+          "title": "Africa Synth Agriculture Seasonal Crop Yields Nigeria | Africa (Electric Sheep Africa metadata inventory)",
+          "score": 58,
+          "tier": "Tier C",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "Cereal Crop Yield Vs Fertilizer Application | Asia (Our World in Data)",
+          "score": 58,
+          "tier": "Tier C",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "models": [
+        {
+          "title": "plant-disease-efficientnetv2s",
+          "score": 42,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "lettuce-disease-detection",
+          "score": 42,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "papers": [
+        {
+          "title": "A comparison of deep learning performance against health-care professionals in detecting diseases from medical imaging: a systematic review and meta-analysis",
+          "score": 53,
+          "tier": "Tier C",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "Deep learning in remote sensing applications: A meta-analysis and review",
+          "score": 48,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ]
+    },
+    "confidenceStatus": "LOW/PARTIAL",
+    "synthesis": "..."
+  },
+  {
+    "id": 4,
+    "name": "Customer Support Ticket Triage",
+    "query": "Customer support ticket triage / multilingual text (classification + priority + NER + summarization, 12GB)",
+    "elapsedMs": 15508,
+    "domainExtracted": "Natural Language Processing & Language Models",
+    "tasksExtracted": [
+      "Classification",
+      "Named Entity Recognition (NER)",
+      "Summarization",
+      "Priority Classification / Triage"
+    ],
+    "hardwareExtracted": "Max 12 GB VRAM",
+    "hardwareFull": {
+      "gpu_recommendation": "User constrained to 12 GB VRAM limit",
+      "vram_estimate": "Max 12 GB VRAM",
+      "training_time_estimate": "~4-8 hours",
+      "cost_estimate": "$8 - $20"
+    },
+    "counts": {
+      "datasets": 25,
+      "models": 25,
+      "papers": 30,
+      "total": 80
+    },
+    "topScores": {
+      "datasets": [
+        {
+          "title": "Customer Support Tickets - CRM dataset",
+          "score": 37,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "multilingual_toxic_lexicon",
+          "score": 37,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "models": [
+        {
+          "title": "ner-multilingual-bert",
+          "score": 48,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "text-classification-model-multilingual",
+          "score": 38,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ],
+      "papers": [
+        {
+          "title": "A SYSTEMATIC REVIEW OF AI AND MACHINE LEARNING-DRIVEN IT SUPPORT SYSTEMS: ENHANCING EFFICIENCY AND AUTOMATION IN TECHNICAL SERVICE MANAGEMENT",
+          "score": 46,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        },
+        {
+          "title": "Exploring the Limits of Transfer Learning with a Unified Text-to-Text\\n Transformer",
+          "score": 46,
+          "tier": "Tier D",
+          "evidence": "PARTIAL"
+        }
+      ]
+    },
+    "confidenceStatus": "LOW/PARTIAL",
+    "synthesis": "..."
+  }
+]

@@ -36,6 +36,12 @@ export type ModalityGroup =
 // This table is symmetric — the check function handles both directions.
 
 const INCOMPATIBLE_PAIRS: [ModalityGroup, ModalityGroup][] = [
+    // Natural vision (RGB photography, industrial imaging) is mutually exclusive with Medical imaging (CT, MRI, X-ray)
+    ['VISION_NATURAL', 'VISION_MEDICAL'],
+    // Natural vision is mutually exclusive with text NLP and tabular
+    ['VISION_NATURAL', 'TEXT_NLP'],
+    ['VISION_NATURAL', 'TABULAR'],
+
     // Audio is mutually exclusive with all visual and tabular modalities
     ['AUDIO', 'VISION_NATURAL'],
     ['AUDIO', 'VISION_MEDICAL'],
@@ -130,9 +136,9 @@ const CANDIDATE_MODALITY_SIGNALS: [RegExp, ModalityGroup][] = [
     // Tabular (pure structured / CSV)
     [/\btabular\b|\.csv|health\s*survey|questionnaire|nhanes|brfss|ehr\b|electronic\s*health\s*record|clinical\s*trial\s*data/i, 'TABULAR'],
     // NLP / Text
-    [/\bnlp\b|natural\s*language|text\s*classif|sentiment|document\s*classif|question\s*answer|summar/i, 'TEXT_NLP'],
-    // Natural Vision (generic images / photos)
-    [/image\s*(?:dataset|classif)|photo|visual|rgb\s*image|natural\s*image|imagenet|coco|cifar/i, 'VISION_NATURAL'],
+    [/\bnlp\b|natural\s*language|text\s*classif|sentiment|document\s*classif|question\s*answer|summar|\bmultilingual\b|\btext\b|\bcorpus\b|\btickets?\b/i, 'TEXT_NLP'],
+    // Natural Vision (generic images / photos / satellite / industrial)
+    [/image\s*(?:dataset|classif)|photo|visual|rgb\s*image|natural\s*image|imagenet|coco|cifar|2d\s*rgb|\bsatellite\b|\bmultispectral\b|\bhyperspectral\b|remote\s*sensing/i, 'VISION_NATURAL'],
 ];
 
 // ── Query → ModalityGroup mapping ─────────────────────────────────────────────
@@ -148,7 +154,9 @@ const QUERY_MODALITY_SIGNALS: [RegExp, ModalityGroup][] = [
     [/rna.?seq|genomic|transcriptom/i, 'GENOMICS'],
     [/\beeg\b|\becg\b|\bekg\b|time.?series|sensor\s*data/i, 'TIME_SERIES'],
     [/\btabular\b|\.csv|health\s*survey|questionnaire/i, 'TABULAR'],
-    [/\bnlp\b|natural\s*language|text\s*classif|sentiment|document/i, 'TEXT_NLP'],
+    [/\bnlp\b|natural\s*language|text\s*classif|sentiment|document|\bmultilingual\b|\btext\b|\btickets?\b/i, 'TEXT_NLP'],
+    [/2d\s*rgb|\brgb\b|\bphoto(?:graph)?s?\b|\bvisual\b|\bnatural\s*image|\bcamera\b|\bimage\b/i, 'VISION_NATURAL'],
+    [/\bmultispectral\b|\bhyperspectral\b|\bsatellite\b|\bremote\s*sensing\b|\bearth\s*observation\b/i, 'VISION_NATURAL'],
 ];
 
 // ── Public API ────────────────────────────────────────────────────────────────

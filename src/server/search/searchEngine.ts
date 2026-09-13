@@ -216,7 +216,7 @@ export async function advancedResearchSearch(
     const isAlzheimerQuery = /alzheimer|dementia|mild\s*cognitive|\bmci\b|adni|oasis|apoe/i.test(schema.originalQuery);
     const isRetinopathyQuery = /retinopath|fundus|ophthalm/i.test(schema.originalQuery);
     const isVehicleQuery = /vehicle|traffic|yolo/i.test(schema.originalQuery);
-    const isSkinQuery = /skin|melanoma|dermoscop|isic|skin\s*lesion/i.test(schema.originalQuery);
+    const isSkinQuery = /melanoma|dermoscop|isic|skin\s*(?:lesion|cancer|disease|tumor)/i.test(schema.originalQuery);
     const isAudioQuery = /speech\s*emotion|audio\s*classif|sound\s*classif|acoustic|asr|speech.to.text|\bspeech\b.*(?:recogni|detect)|\baudio\b/i.test(schema.originalQuery);
     const isChestXRayQuery = /chest\s*x.ray|chest\s*xr|pulmonary|pneumonia|pneumothorax|lung\s*(nodule|cancer|mass|ct|segment|classif)/i.test(schema.originalQuery);
     const isNucleiQuery = /nuclei|monuseg|stardist|histolog|fluorescence\s*microscopy|digital\s*pathology|h&e|haematoxylin/i.test(schema.originalQuery);
@@ -333,7 +333,7 @@ Keep it scientific, concise, and grounded. Do not fabricate dataset names.`;
     }
 
     // Ensure user hardware constraints override fallbacks
-    const vramMatch = schema.originalQuery.match(/\b(\d+)\s*(?:gb|g)\s*(?:gpu|vram)?\b/i);
+    const vramMatch = schema.originalQuery.match(/\b(\d+)\s*(?:gb|g)(?:\s*(?:gpu|vram))?\b/i);
     if (vramMatch) {
         hardware = {
             gpu_recommendation: `User constrained to ${vramMatch[1]} GB VRAM limit`,

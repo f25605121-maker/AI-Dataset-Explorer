@@ -85,9 +85,14 @@ const DOMAIN_RULES: DomainMatchRule[] = [
         test: (q) => /lung|pulmonary|pneumonia|cxr|chest\s*x.?ray|pleural|bronchial/i.test(q),
     },
     {
-        domain: 'Agriculture & Plant Pathology',
-        subdomains: ['Crop Disease Detection', 'Plant Phenotyping', 'Precision Agriculture'],
-        test: (q) => /crop|plant|leaf|leaves|agriculture|farming|weed/i.test(q),
+        domain: 'Aerospace & Industrial Defect Inspection',
+        subdomains: ['Surface Defect Detection', 'Aircraft Inspection', 'Industrial Quality Control'],
+        test: (q) => /aircraft|airplane|aerospace|fuselage|aviation|defect|panel|surface\s*inspection|crack|corrosion|manufacturing\s*defect/i.test(q),
+    },
+    {
+        domain: 'Agriculture & Remote Sensing',
+        subdomains: ['Crop Disease Detection', 'Crop Yield Estimation', 'Satellite Agriculture', 'Precision Agriculture'],
+        test: (q) => /crop|plant|leaf|leaves|agriculture|farming|weed|satellite|multispectral|remote\s*sensing/i.test(q),
     },
     {
         domain: 'Structural Biology & Cryo-Microscopy',
@@ -111,8 +116,8 @@ const DOMAIN_RULES: DomainMatchRule[] = [
     },
     {
         domain: 'Natural Language Processing & Language Models',
-        subdomains: ['LLMs', 'Information Extraction', 'Machine Translation'],
-        test: (q) => /nlp|natural\s*language|sentiment|llm|transformer|text\s*classif|summariz/i.test(q),
+        subdomains: ['Ticket Triage', 'Text Classification', 'Information Extraction', 'Summarization'],
+        test: (q) => /nlp|natural\s*language|sentiment|llm|transformer|text\s*classif|summariz|ticket|triage|customer\s*support|\btext\b|\bmultilingual\b|\bner\b/i.test(q),
     },
     {
         domain: 'Audio & Speech Processing',
@@ -220,7 +225,16 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
     if (/video|cctv|camera\s*stream|stream/i.test(qLower)) {
         modalities.push('Video');
     }
-    if (/retin|fundus|photo|dermoscop|image|camera|picture|cats?\s*and\s*dogs|vehicle/i.test(qLower) && !modalities.includes('Microscopy') && !modalities.includes('Image') && !modalities.includes('MRI') && !modalities.includes('CT') && !modalities.includes('X-ray')) {
+    if (/satellite|multispectral|hyperspectral|remote\s*sensing/i.test(qLower)) {
+        modalities.push('Satellite / Multispectral');
+    }
+    if (/2d\s*rgb|\brgb\b/i.test(qLower)) {
+        modalities.push('2D RGB');
+    }
+    if (/text|multilingual|\bnlp\b|language|sentences?|documents?|tickets?/i.test(qLower)) {
+        modalities.push('Text / Multilingual');
+    }
+    if (/retin|fundus|photo|dermoscop|image|camera|picture|cats?\s*and\s*dogs|vehicle/i.test(qLower) && !modalities.includes('Microscopy') && !modalities.includes('Image') && !modalities.includes('MRI') && !modalities.includes('CT') && !modalities.includes('X-ray') && !modalities.includes('2D RGB') && !modalities.includes('Satellite / Multispectral')) {
         modalities.push('Image');
     }
     if (/audio|speech|voice|wav|acoustic/i.test(qLower)) {
@@ -244,7 +258,7 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         samplingStrategy.push('Compressed sensing');
     }
 
-    // 5. Reconstruction, Prediction, and Estimation Tasks
+    // 5. Reconstruction, Prediction, and Estimation Tasks (Multi-Task Extraction)
     const reconstructionTasks: string[] = [];
     const predictionTasks: string[] = [];
     const estimationTasks: string[] = [];
@@ -272,83 +286,49 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         estimationTasks.push('Flow quantification', 'Hemodynamic parameter estimation');
     }
 
+    if (/regression|yield/i.test(qLower)) {
+        predictionTasks.push('Regression');
+    }
     if (/progression|time\s*to\s*progression|predict\s*progression|conversion/i.test(qLower)) {
         predictionTasks.push('Progression Prediction', 'Time-to-Event Modeling');
     }
     if (/instance\s*segmentation/i.test(qLower)) {
         predictionTasks.push('Instance Segmentation');
     } else if (/segment/i.test(qLower)) {
-        predictionTasks.push('Segmentation', 'Anatomical delineation');
+        predictionTasks.push('Segmentation');
     }
     if (/object\s*detection|detect|bounding\s*box|yolo/i.test(qLower)) {
         predictionTasks.push('Object Detection');
     }
     if (/classif|diagnos|early\s*detection|disease\s*detection/i.test(qLower)) {
-        predictionTasks.push('Classification', 'Diagnostic categorization');
+        predictionTasks.push('Classification');
+    }
+    if (/named\s*entity\s*recognition|\bner\b/i.test(qLower)) {
+        predictionTasks.push('Named Entity Recognition (NER)');
+    }
+    if (/summariz/i.test(qLower)) {
+        predictionTasks.push('Summarization');
+    }
+    if (/priority|triage|ranking/i.test(qLower)) {
+        predictionTasks.push('Priority Classification / Triage');
     }
     if (/anomaly|fraud/i.test(qLower)) {
         predictionTasks.push('Anomaly Detection', 'Imbalanced Classification');
     }
 
-    // 6. Physiological Targets & Target Entities
+    // 6. Generic Target Entities & Outputs
     const physiologicalTargets: string[] = [];
     const targetEntities: string[] = [];
     const targetOutputs: string[] = [];
 
-    if (/alzheimer|dementia|mild\s*cognitive\s*impairment|\bmci\b|adni|oasis|apoe/i.test(qLower)) {
-        targetEntities.push("Alzheimer's Disease", "Mild Cognitive Impairment (MCI)", "ADNI", "OASIS");
-        targetOutputs.push("Progression to Alzheimer's Disease (24-36 months)", "Time to progression estimation");
-    }
-    if (/retinopath|retina|fundus|macular|glaucoma/i.test(qLower)) {
-        targetEntities.push("Diabetic Retinopathy", "Retinal Fundus Lesions");
-        targetOutputs.push("Diabetic Retinopathy Severity Grading");
-    }
-    if (/vehicle|traffic|car\b|autonomous|yolo/i.test(qLower)) {
-        targetEntities.push("Vehicles", "Traffic Surveillance", "YOLOv8");
-        targetOutputs.push("Vehicle Bounding Boxes & Instance Masks");
-    }
-    if (/cats?\s*and\s*dogs?|pet\b|animal/i.test(qLower)) {
-        targetEntities.push("Cats and Dogs", "Oxford-IIIT Pet");
-        targetOutputs.push("Pet Breed Classification Labels");
-    }
-    if (/nuclei|monuseg|stardist/i.test(qLower)) {
-        targetEntities.push("Cell Nuclei", "MoNuSeg", "StarDist");
-        targetOutputs.push("Nuclei Segmentation Masks");
-    }
-    if (/skin\s*lesion|melanoma|isic/i.test(qLower)) {
-        targetEntities.push("Melanoma", "Skin Lesion", "ISIC");
-        targetOutputs.push("Malignancy Classification Labels");
-    }
-    if (/pneumonia|chest\s*x.?ray|cxr|mimic/i.test(qLower)) {
-        targetEntities.push("Pneumonia", "Chest Radiograph", "MIMIC-CXR");
-        targetOutputs.push("Pneumonia / Pathology Classification");
-    }
-    if (/credit\s*card\s*fraud|fraud/i.test(qLower)) {
-        targetEntities.push("Credit Card Fraud", "Financial Anomaly");
-        targetOutputs.push("Fraudulent Transaction Flags");
-    }
-    if (/crop|plant|leaf|disease/i.test(qLower) && primaryDomain === 'Agriculture & Plant Pathology') {
-        targetEntities.push("Crop Plant", "Plant Leaf Disease");
-        targetOutputs.push("Crop Disease Classification Labels");
+    // Domain-agnostic entity extraction: parse the core problem clauses
+    const clauses = q.split(/[/+(),-]/).map(s => s.trim()).filter(s => s.length > 2 && !/^\d+\s*gb$/i.test(s));
+    for (const clause of clauses) {
+        if (!/classification|segmentation|detection|regression|summarization|ner|priority|3d|2d|4d|rgb/i.test(clause)) {
+            targetEntities.push(clause);
+        }
     }
 
-    if (/blood\s*flow|flow/i.test(qLower)) {
-        physiologicalTargets.push('Blood flow', 'Vascular flow', 'Hemodynamics');
-        targetEntities.push('Cardiovascular blood flow');
-    }
-    if (/velocity\s*field|velocity/i.test(qLower)) {
-        physiologicalTargets.push('Velocity field vectors', '3-directional velocity');
-        targetEntities.push('3D velocity vector fields');
-        targetOutputs.push('3-directional spatial + temporal velocity fields');
-    }
-    if (/wall\s*shear\s*stress|wss/i.test(qLower)) {
-        physiologicalTargets.push('Wall shear stress (WSS)', 'Oscillatory shear index (OSI)');
-        targetEntities.push('Wall shear stress maps');
-        targetOutputs.push('Hemodynamic wall shear stress distribution maps');
-    }
-    if (/k-space/i.test(qLower)) {
-        targetEntities.push('Raw undersampled k-space data');
-    }
 
     // 7. Temporal & Dimensionality Constraints
     const dimensionality: string[] = [];
@@ -473,7 +453,7 @@ export function parseResearchQuery(rawQuery: string): ResearchQuerySchema {
         : undefined;
 
     const tasksList = [...reconstructionTasks, ...estimationTasks, ...predictionTasks];
-    const vramMatch = q.match(/\b(\d+)\s*(?:gb|g)\s*(?:gpu|vram)?\b/i);
+    const vramMatch = q.match(/\b(\d+)\s*(?:gb|g)(?:\s*(?:gpu|vram))?\b/i);
     const maxVramGb = vramMatch ? parseInt(vramMatch[1], 10) : 'UNKNOWN';
 
     return {

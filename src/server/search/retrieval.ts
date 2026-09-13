@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Search Engine Retrieval Adapter
  *
  * Exposes the backwards-compatible `advancedSearch` method by delegating to the
@@ -14,6 +14,7 @@ import {
 import { advancedResearchSearch } from './searchEngine';
 import { queryFastApiRecommend } from './fastapiClient';
 import { getFallbackBaselineModels } from './modelsFallback';
+import { scoreCandidate } from './scoring';
 
 export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
     // Run both pipelines concurrently for speed and merge them
@@ -94,10 +95,15 @@ export async function advancedSearch(rawQuery: string): Promise<SearchResult> {
             }
         }
 
-        // Keep model discovery useful when the live FastAPI service is unavailable
-        // or strict compatibility filtering removes all public checkpoints.
+        // Subject any fallback baseline models to the exact same verification and scoring
         if (models.length === 0 && res.diagnostics?.parsedQuery) {
-            models.push(...getFallbackBaselineModels(res.diagnostics.parsedQuery as any));
+            const baselines = getFallbackBaselineModels(res.diagnostics.parsedQuery as any);
+            for (const b of baselines) {
+                const scored = scoreCandidate(b, res.diagnostics.parsedQuery as any);
+                if (scored.matchScore > 0 && !scored.matchBreakdown?.disqualifications?.length) {
+                    models.push(scored as unknown as UnifiedCandidate);
+                }
+            }
         }
     }
 

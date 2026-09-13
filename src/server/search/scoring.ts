@@ -169,6 +169,7 @@ export function scoreCandidate(
     input: ResearchQuerySchema | StructuredQueryUnderstanding
 ): RankedResult {
     
+    const schema = input as any;
     const originalQuery = input.rawQuery;
     const title = candidate.title || candidate.name || '';
     const desc = candidate.description || '';
@@ -192,83 +193,49 @@ export function scoreCandidate(
     // Adaptive weights
     const weights = computeAdaptiveWeights(input);
 
-    // Specialized technique scoring (4D flow, phase-contrast, radial, longitudinal, instance segmentation)
-    let techniqueScore = 75;
-    const is4DFlowQuery = /4d\s*flow|phase\s*contrast|pc.?mri/i.test(originalQuery);
-    const isRadialQuery = /radial/i.test(originalQuery);
-    const isLongitudinalQuery = /longitudinal|multi-timepoint|progression/i.test(originalQuery);
-    const isYoloQuery = /yolo|instance\s*segmentation/i.test(originalQuery);
-    const isFundusQuery = /fundus|retinopath/i.test(originalQuery);
-    const isMicroscopyQuery = /nuclei|microscop|fluorescence/i.test(originalQuery);
-
-    if (is4DFlowQuery) {
-        if (/4d\s*flow|phase\s*contrast|pc.?mri/i.test(candidateBlob)) {
-            techniqueScore = 100;
-        } else if (/flow|velocity|hemodynamic/i.test(candidateBlob)) {
-            techniqueScore = 80;
-        } else if (/cine|b-mode|ssfp/i.test(candidateBlob)) {
-            techniqueScore = 35; // Cine is penalized relative to 4D Flow
-        } else {
-            techniqueScore = 20;
+    // ── Generalized Domain-Agnostic Feature Scoring ──
+    let techniqueScore = Math.round(cross.suitability * 100);
+    const queryTechniques = [...(schema.acquisitionTechnique || []), ...(schema.samplingStrategy || [])];
+    if (queryTechniques.length > 0) {
+        let techMatches = 0;
+        for (const tech of queryTechniques) {
+            const words = tech.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+            const matchedWords = words.filter((w: string) => candidateBlob.includes(w));
+            if (matchedWords.length > 0) techMatches += (matchedWords.length / words.length);
         }
-    } else if (isLongitudinalQuery) {
-        if (/longitudinal|adni|oasis|progression|temporal/i.test(candidateBlob)) {
-            techniqueScore = 95;
-        } else {
-            techniqueScore = 65;
-        }
-    } else if (isYoloQuery) {
-        if (/yolo|instance\s*segmentation|bounding\s*box/i.test(candidateBlob)) {
-            techniqueScore = 95;
-        } else {
-            techniqueScore = 70;
-        }
-    } else if (isFundusQuery) {
-        if (/fundus|retina|retinopath|ophthalm/i.test(candidateBlob)) {
-            techniqueScore = 95;
-        } else {
-            techniqueScore = 70;
-        }
-    } else if (isMicroscopyQuery) {
-        if (/nuclei|microscop|stardist|cellpose/i.test(candidateBlob)) {
-            techniqueScore = 95;
-        } else {
-            techniqueScore = 70;
-        }
+        techniqueScore = Math.max(techniqueScore, Math.round(Math.min(1.0, techMatches / queryTechniques.length) * 100));
     }
 
-    if (isRadialQuery) {
-        if (/radial|non[- ]cartesian|golden[- ]angle|spoke/i.test(candidateBlob)) {
-            techniqueScore = Math.min(100, techniqueScore + 20);
-        } else {
-            techniqueScore = Math.max(20, techniqueScore - 15);
-        }
-    }
-
-    // Dimension score
+    // Generalized Dimensionality Scoring
     let dimensionScore = Math.round(cross.dimensionMatch * 100);
-    if (/4d|longitudinal/i.test(originalQuery)) {
-        if (/4d|longitudinal|multi-timepoint|time-resolved 3d/i.test(candidateBlob)) dimensionScore = 100;
-        else if (/3d|volumetric|nifti/i.test(candidateBlob)) dimensionScore = 80;
-        else dimensionScore = 40;
+    const is3DQuery = /\b(?:3d|volumetric|nifti|ct|mri)\b/i.test(originalQuery);
+    const is4DQuery = /\b(?:4d|longitudinal|time-resolved 3d)\b/i.test(originalQuery);
+    const is2DQuery = /\b(?:2d|rgb|image|photo|satellite)\b/i.test(originalQuery) && !is3DQuery && !is4DQuery;
+    const isCandidate3D = /\b(?:3d|volumetric|voxel|nifti|dicom|\.nii)\b/i.test(candidateBlob);
+    const isCandidate4D = /\b(?:4d|longitudinal|multi-timepoint|time-resolved)\b/i.test(candidateBlob);
+
+    if (is4DQuery) {
+        dimensionScore = isCandidate4D ? 100 : isCandidate3D ? 75 : 30;
+    } else if (is3DQuery) {
+        dimensionScore = isCandidate3D ? 100 : 35;
+    } else if (is2DQuery) {
+        dimensionScore = isCandidate3D ? 25 : 95;
     }
 
-    // Target output score
+    // Generalized Entity and Subject Target Overlap
     let targetScore = Math.round(cross.targetMatch * 100);
-    if (/velocity/i.test(originalQuery) && /velocity/i.test(candidateBlob)) {
-        targetScore = Math.min(100, targetScore + 25);
-    }
-    if (/wall\s*shear|wss/i.test(originalQuery) && /wall\s*shear|wss|shear\s*stress/i.test(candidateBlob)) {
-        targetScore = Math.min(100, targetScore + 25);
-    }
-    if (/alzheimer|dementia/i.test(originalQuery) && /alzheimer|adni|oasis|mci|cognitive/i.test(candidateBlob)) {
-        targetScore = Math.min(100, targetScore + 30);
-    }
-    if (/retinopath/i.test(originalQuery) && /retinopath|fundus|eyepacs/i.test(candidateBlob)) {
-        targetScore = Math.min(100, targetScore + 30);
-    }
-    if (/vehicle|traffic/i.test(originalQuery) && /vehicle|car|traffic|bdd100k/i.test(candidateBlob)) {
-        targetScore = Math.min(100, targetScore + 30);
+    const queryEntities = (schema.targetEntities || []).filter((e: string) => e && e.length > 2);
+    if (queryEntities.length > 0) {
+        let entityMatches = 0;
+        for (const entity of queryEntities) {
+            const words = entity.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+            const matchedWords = words.filter((w: string) => candidateBlob.includes(w));
+            if (matchedWords.length > 0) {
+                entityMatches += (matchedWords.length / words.length);
+            }
+        }
+        const entityCoverage = Math.min(1.0, entityMatches / queryEntities.length);
+        targetScore = Math.max(targetScore, Math.round(entityCoverage * 100));
     }
 
     // 🚀 — PHASE 1.5: Calibrate Evidence Coverage (Requirements) — 
@@ -384,12 +351,11 @@ export function scoreCandidate(
             });
         }
 
+        const isBiomedical = /biomedical|pulmonary|neurology|cardiology|oncology|pathology|anatomy|mri|ct\b|x.?ray/i.test((schema as any).primaryDomain || '');
         const S_domain = Math.round(
-            (domainScore * 0.35) +
-            (anatomyScore * 0.25) + // anatomyScore acts as primary entity match for non-medical domains
-            (techniqueScore * 0.15) +
-            (targetScore * 0.15) +
-            (evidenceScore * 0.10)
+            isBiomedical
+                ? (domainScore * 0.30 + anatomyScore * 0.25 + targetScore * 0.25 + techniqueScore * 0.10 + evidenceScore * 0.10)
+                : (domainScore * 0.45 + targetScore * 0.35 + techniqueScore * 0.10 + evidenceScore * 0.10)
         );
 
         // S_semantic: BM25 + suitability + metadata quality (0-100)

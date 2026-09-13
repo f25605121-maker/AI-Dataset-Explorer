@@ -6,8 +6,8 @@ const CATEGORY_WEIGHT: Partial<Record<RequirementCategory, number>> = {
     DATA_SIZE: 0.06, LABEL_AVAILABILITY: 0.07, OTHER: 0.05,
     PRETRAINING: 0.03, COMPUTE: 0.05, TEMPORAL: 0.04, MULTIMODAL: 0.06,
 };
-const TASKS = /classification|classify|recognition|segmentation|segment(?:ation)?|detection|detect|localization|tracking|forecast(?:ing)?|prediction|regression|ranking|retrieval|recommendation|clustering|generation|translation|summarization|question answering|speech recognition|pose estimation|anomaly detection|control|planning|reinforcement learning/i;
-const MODALITIES = /image|photo(?:graph)?s?|video|audio|speech|voice|text|language|tabular|csv|time[- ]series|sensor|3d|3-d|point[- ]cloud|multimodal|genomic|geospatial|satellite|ct\b|mri\b|ultrasound|eeg|lidar/i;
+const TASKS = /classification|classify|recognition|segmentation|segment(?:ation)?|detection|detect|localization|tracking|forecast(?:ing)?|prediction|regression|ranking|priority|retrieval|recommendation|clustering|generation|translation|summarization|summariz|question answering|speech recognition|pose estimation|anomaly detection|control|planning|reinforcement learning|named entity recognition|\bner\b/i;
+const MODALITIES = /image|photo(?:graph)?s?|video|audio|speech|voice|text|multilingual|language|tabular|csv|time[- ]series|sensor|3d|3-d|point[- ]cloud|multimodal|genomic|geospatial|satellite|multispectral|hyperspectral|ct\b|mri\b|ultrasound|eeg|lidar/i;
 const STRUCTURE = /2d|3d|4d|volumetric|sequence|sequential|temporal|spatial|graph|point[- ]cloud|stream/i;
 
 function unique(values: string[]): string[] { return [...new Set(values.map(value => value.trim()).filter(Boolean))]; }
@@ -29,7 +29,13 @@ export function extractRequirementProfile(rawQuery: string): RequirementProfile 
     const explicitTask = phrase(query, /\b(?:task|to|for)\s+(?:is\s+)?([a-z][a-z -]{2,40})/i);
     const taskMatches = unique((lower.match(new RegExp(TASKS.source, 'gi')) || []));
     const task = explicitTask && TASKS.test(explicitTask) ? explicitTask : taskMatches[0] || null;
-    if (task) add(requirements, hardRequirementIds, softRequirementIds, 'req_task', 'TASK', task, `Required task: ${task}`, true, explicitTask ? 0.95 : 0.8, explicitTask ? 'explicit' : 'inferred');
+    if (taskMatches.length > 0) {
+        taskMatches.forEach((t, idx) => {
+            add(requirements, hardRequirementIds, softRequirementIds, `req_task_${idx}`, 'TASK', t, `Required task: ${t}`, false, 0.85, 'explicit');
+        });
+    } else if (task) {
+        add(requirements, hardRequirementIds, softRequirementIds, 'req_task', 'TASK', task, `Required task: ${task}`, false, explicitTask ? 0.95 : 0.8, explicitTask ? 'explicit' : 'inferred');
+    }
 
     const modalityMatches = unique(lower.match(new RegExp(MODALITIES.source, 'gi')) || []);
     const modality = modalityMatches[0] || null;
@@ -66,7 +72,7 @@ export function extractRequirementProfile(rawQuery: string): RequirementProfile 
     const hasClinicalData = /clinical|patient|ehr|electronic health|medical record/i.test(lower);
     const hasClassImbalance = /class imbalance|imbalanced|rare class/i.test(lower);
     const hasMissingData = /missing data|missing values?|incomplete/i.test(lower);
-    const gpu = Number(lower.match(/(\d+)\s*gb\s*(?:vram|gpu|memory)/i)?.[1] || '') || null;
+    const gpu = Number(lower.match(/(\d+)\s*gb(?:\s*(?:vram|gpu|memory))?\b/i)?.[1] || '') || null;
     if (gpu) add(requirements, hardRequirementIds, softRequirementIds, 'req_gpu', 'GPU', `${gpu}GB`, `Compute limit: ${gpu}GB`, true, 0.95, 'explicit');
 
     const totalWeight = requirements.reduce((sum, item) => sum + item.weight, 0) || 1;

@@ -367,6 +367,26 @@ export function expandQueries(
         const task = primaryTask || shortQueryTokens.slice(-2).join(' ');
         const modality = primaryModality && primaryModality !== 'Multimodal / General' ? primaryModality : '';
 
+        // Always include clean, distilled phrases from user's actual query clauses
+        const queryClauses = rawQuery
+            .split(/[/+(),;]/)
+            .map(s => s.replace(/\b\d+\s*gb(?:\s*(?:gpu|vram))?\b/gi, '').trim())
+            .filter(s => s.length >= 3 && !/^(regression|classification|segmentation|detection|ner|summarization|priority|2d|3d|4d|rgb)$/i.test(s));
+
+        for (const clause of queryClauses) {
+            addQuery(`${clause} dataset`, 1, 'dataset');
+            addQuery(clause, 2, 'dataset');
+            addQuery(`${clause} model`, 1, 'model');
+            addQuery(clause, 2, 'model');
+            addQuery(`${clause} deep learning`, 1, 'paper');
+        }
+
+        if (queryClauses.length >= 2) {
+            const combinedTwo = `${queryClauses[0]} ${queryClauses[1]}`.slice(0, 45);
+            addQuery(`${combinedTwo} dataset`, 1, 'dataset');
+            addQuery(`${combinedTwo} model`, 1, 'model');
+        }
+
         // TIER 1: Full compound [Entity + Task + Modality] strings
         if (entity && task && modality) {
             addQuery(`${entity} ${task} ${modality} dataset`, 1, 'dataset');
