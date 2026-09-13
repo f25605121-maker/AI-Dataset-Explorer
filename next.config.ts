@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-    eslint: {
-        ignoreDuringBuilds: true,
-    },
     poweredByHeader: false, // Remove X-Powered-By: Next.js
     async headers() {
         return [
